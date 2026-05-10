@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register — AIoT Fall Detection</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="auth-page">
+
+<div class="auth-box">
+    <h2>📝 Create Account</h2>
+    <p class="auth-sub">Register to use the monitoring system</p>
+
+    <div id="msg" class="error-msg" style="display:none"></div>
+
+    <input id="name"     type="text"     placeholder="Full name">
+    <input id="email"    type="email"    placeholder="Email address">
+    <input id="password" type="password" placeholder="Password">
+    <input id="confirm"  type="password" placeholder="Confirm password">
+
+    <label class="show-pw-label">
+        <input type="checkbox" onchange="togglePw()"> Show password
+    </label>
+
+    <button onclick="sendOTP()">Send OTP</button>
+
+    <div id="otp-section" style="display:none; margin-top:12px">
+        <input id="otp" type="text" placeholder="Enter 6-digit OTP" maxlength="6">
+        <button onclick="verify()">Verify &amp; Register</button>
+    </div>
+
+    <p class="auth-footer"><a href="/">← Back to Login</a></p>
+</div>
+
+<script>
+function togglePw() {
+    const t = document.getElementById("password").type === "password" ? "text" : "password";
+    document.getElementById("password").type = t;
+    document.getElementById("confirm").type  = t;
+}
+
+function showMsg(msg, isError = true) {
+    const el = document.getElementById("msg");
+    el.textContent    = msg;
+    el.style.display  = "block";
+    el.className      = isError ? "error-msg" : "success-msg";
+}
+
+async function sendOTP() {
+    const email    = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const confirm  = document.getElementById("confirm").value;
+
+    if (!document.getElementById("name").value.trim()) {
+        return showMsg("Please enter your full name.");
+    }
+    if (!email) return showMsg("Please enter your email.");
+    if (password.length < 6) return showMsg("Password must be at least 6 characters.");
+    if (password !== confirm) return showMsg("Passwords do not match.");
+
+    const res  = await fetch("/send-otp", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email }),
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+        showMsg("OTP sent! Check the server console.", false);
+        document.getElementById("otp-section").style.display = "block";
+    } else {
+        showMsg(data.msg || "Failed to send OTP.");
+    }
+}
+
+async function verify() {
+    const email    = document.getElementById("email").value.trim();
+    const name     = document.getElementById("name").value.trim();
+    const password = document.getElementById("password").value;
+    const otp      = document.getElementById("otp").value.trim();
+
+    if (!otp) return showMsg("Please enter the OTP.");
+
+    const res  = await fetch("/verify-otp", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email, otp, name, password }),
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+        showMsg("Registration successful! Redirecting…", false);
+        setTimeout(() => window.location.href = "/dashboard", 1200);
+    } else {
+        showMsg(data.msg || "Verification failed.");
+    }
+}
+</script>
+</body>
+</html>

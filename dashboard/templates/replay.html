@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+{% block title %}Replay — AIoT{% endblock %}
+{% block content %}
+
+<h2>🔁 Event Replay</h2>
+<p>Recorded fall-detection events from this session.</p>
+
+<div id="no-events" class="card" style="color:#888">No events recorded yet.</div>
+
+<table id="event-table" class="event-table" style="display:none">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Time</th>
+            <th>State</th>
+            <th>Risk</th>
+            <th>L1</th>
+            <th>L2</th>
+            <th>L3</th>
+        </tr>
+    </thead>
+    <tbody id="event-body"></tbody>
+</table>
+
+<script>
+const RECORD_STATES = new Set(["UNBALANCED", "FALLING", "CRITICAL"]);
+let eventCount = 0;
+
+var socket = io();
+
+socket.on("update", function(data) {
+    const state = data.state || data.status || "NORMAL";
+    if (!RECORD_STATES.has(state)) return;
+
+    eventCount++;
+    document.getElementById("no-events").style.display    = "none";
+    document.getElementById("event-table").style.display  = "table";
+
+    const stateClass = {
+        UNBALANCED: "status-warning",
+        FALLING:    "status-danger",
+        CRITICAL:   "status-critical",
+    }[state] || "";
+
+    const row = document.createElement("tr");
+    row.innerHTML = `
+        <td>${eventCount}</td>
+        <td>${data.time ?? "--"}</td>
+        <td><span class="status-badge ${stateClass}">${state}</span></td>
+        <td>${data.risk ?? 0}%</td>
+        <td>${data.l1}</td>
+        <td>${data.l2}</td>
+        <td>${data.l3}</td>
+    `;
+    // Prepend so newest is at top
+    const tbody = document.getElementById("event-body");
+    tbody.insertBefore(row, tbody.firstChild);
+});
+</script>
+
+{% endblock %}

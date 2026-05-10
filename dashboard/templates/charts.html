@@ -1,0 +1,84 @@
+{% extends "layout.html" %}
+{% block title %}Charts — AIoT{% endblock %}
+{% block content %}
+
+<h2>📈 Realtime Sensor Chart</h2>
+
+<div class="card" style="max-width:700px">
+    <canvas id="chart" height="120"></canvas>
+</div>
+
+<div class="card" style="max-width:700px; margin-top:16px">
+    <canvas id="lineChart" height="120"></canvas>
+</div>
+
+<!-- Chart.js MUST be loaded before the inline scripts that use it -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+// ── Bar chart (current readings) ─────────────────────────────────────────────
+const barChart = new Chart(document.getElementById("chart"), {
+    type: "bar",
+    data: {
+        labels: ["L1", "L2", "L3"],
+        datasets: [{
+            label: "Sensor Level",
+            data:  [0, 0, 0],
+            backgroundColor: ["#3b82f6", "#10b981", "#f59e0b"],
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        animation: { duration: 300 },
+        scales: { y: { beginAtZero: true, max: 10 } },
+        plugins: { legend: { display: false } },
+    }
+});
+
+// ── Line chart (history of L1) ────────────────────────────────────────────────
+const MAX_POINTS = 30;
+const history = { labels: [], l1: [], l2: [], l3: [] };
+
+const lineChart = new Chart(document.getElementById("lineChart"), {
+    type: "line",
+    data: {
+        labels: history.labels,
+        datasets: [
+            { label: "L1", data: history.l1, borderColor: "#3b82f6", tension: 0.4, pointRadius: 2 },
+            { label: "L2", data: history.l2, borderColor: "#10b981", tension: 0.4, pointRadius: 2 },
+            { label: "L3", data: history.l3, borderColor: "#f59e0b", tension: 0.4, pointRadius: 2 },
+        ]
+    },
+    options: {
+        animation: { duration: 0 },
+        scales: { y: { beginAtZero: true, max: 10 } },
+    }
+});
+
+// ── SocketIO updates ──────────────────────────────────────────────────────────
+var socket = io();
+
+socket.on("update", function(data) {
+    // Update bar chart
+    barChart.data.datasets[0].data = [data.l1, data.l2, data.l3];
+    barChart.update();
+
+    // Append to history
+    const ts = data.time || new Date().toLocaleTimeString();
+    history.labels.push(ts);
+    history.l1.push(data.l1);
+    history.l2.push(data.l2);
+    history.l3.push(data.l3);
+
+    if (history.labels.length > MAX_POINTS) {
+        history.labels.shift();
+        history.l1.shift();
+        history.l2.shift();
+        history.l3.shift();
+    }
+
+    lineChart.update();
+});
+</script>
+
+{% endblock %}

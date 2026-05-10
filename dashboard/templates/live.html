@@ -1,0 +1,78 @@
+{% extends "layout.html" %}
+{% block title %}Live — AIoT{% endblock %}
+{% block content %}
+
+<h2>🎥 Live Monitoring</h2>
+
+<div class="live-layout">
+
+    <div class="live-feed">
+        <!-- /video is served by Flask from the ESP32-CAM stream -->
+        <img id="cam-feed" src="/video" alt="Camera feed">
+        <div class="cam-label">ESP32-CAM</div>
+    </div>
+
+    <div class="live-panel">
+        <h3>AI Status</h3>
+
+        <div id="state-badge" class="status-badge status-normal">NORMAL</div>
+
+        <div class="info-row">
+            <span class="info-label">Risk</span>
+            <span id="risk">0%</span>
+        </div>
+
+        <div class="info-row">
+            <span class="info-label">Time</span>
+            <span id="time">--:--:--</span>
+        </div>
+
+        <div class="info-row">
+            <span class="info-label">L1</span>
+            <span id="l1">0</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">L2</span>
+            <span id="l2">0</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">L3</span>
+            <span id="l3">0</span>
+        </div>
+
+        <div id="fall-alert" class="fall-alert" style="display:none; margin-top:16px">
+            ⚠️ FALL DETECTED
+        </div>
+    </div>
+
+</div>
+
+<script>
+const stateColors = {
+    NORMAL:     "status-normal",
+    UNBALANCED: "status-warning",
+    FALLING:    "status-danger",
+    CRITICAL:   "status-critical",
+};
+
+var socket = io();
+
+socket.on("update", function(data) {
+    const badge = document.getElementById("state-badge");
+    const state = data.state || data.status || "NORMAL";
+
+    badge.innerText   = state;
+    badge.className   = "status-badge " + (stateColors[state] || "status-normal");
+
+    document.getElementById("risk").innerText = (data.risk ?? 0) + "%";
+    document.getElementById("time").innerText = data.time ?? "--";
+    document.getElementById("l1").innerText   = data.l1;
+    document.getElementById("l2").innerText   = data.l2;
+    document.getElementById("l3").innerText   = data.l3;
+
+    const alertEl = document.getElementById("fall-alert");
+    alertEl.style.display = (state === "FALLING" || state === "CRITICAL") ? "block" : "none";
+});
+</script>
+
+{% endblock %}

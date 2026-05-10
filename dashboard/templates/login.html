@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — AIoT Fall Detection</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="auth-page">
+
+<div class="auth-box">
+    <h2>🔐 AIoT Fall Detection</h2>
+    <p class="auth-sub">Sign in to your account</p>
+
+    <div id="error-msg" class="error-msg" style="display:none"></div>
+
+    <input  id="email"    type="email"    placeholder="Email address" autocomplete="email">
+    <input  id="password" type="password" placeholder="Password"      autocomplete="current-password">
+
+    <label class="show-pw-label">
+        <input type="checkbox" onchange="togglePw()"> Show password
+    </label>
+
+    <button onclick="doLogin()">Login</button>
+
+    <p class="auth-footer">
+        Don't have an account? <a href="/register">Register</a>
+    </p>
+</div>
+
+<script>
+function togglePw() {
+    const p = document.getElementById("password");
+    p.type = p.type === "password" ? "text" : "password";
+}
+
+async function doLogin() {
+    const email    = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const errEl    = document.getElementById("error-msg");
+
+    if (!email || !password) {
+        showError("Please enter your email and password.");
+        return;
+    }
+
+    const res  = await fetch("/login", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+        window.location.href = "/dashboard";
+    } else {
+        showError(data.msg || "Login failed.");
+    }
+}
+
+function showError(msg) {
+    const el = document.getElementById("error-msg");
+    el.textContent = msg;
+    el.style.display = "block";
+}
+
+// Allow pressing Enter to submit
+document.addEventListener("keydown", e => {
+    if (e.key === "Enter") doLogin();
+});
+</script>
+</body>
+</html>

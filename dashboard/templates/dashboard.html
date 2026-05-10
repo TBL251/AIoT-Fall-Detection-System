@@ -1,0 +1,76 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard — AIoT{% endblock %}
+{% block content %}
+
+<h2>📊 Realtime Dashboard</h2>
+
+<div id="fall-alert" class="fall-alert" style="display:none">
+    ⚠️ FALL DETECTED — Please check immediately!
+</div>
+
+<div class="card-grid">
+
+    <div class="card">
+        <div class="card-label">Status</div>
+        <div id="status" class="status-badge status-normal">Normal</div>
+    </div>
+
+    <div class="card">
+        <div class="card-label">Risk Level</div>
+        <div id="risk" class="big-number">0%</div>
+    </div>
+
+    <div class="card">
+        <div class="card-label">Last Update</div>
+        <div id="time" class="big-number">--:--:--</div>
+    </div>
+
+</div>
+
+<div class="card-grid" style="margin-top:16px">
+
+    <div class="card">
+        <div class="card-label">Sensor L1</div>
+        <div id="l1" class="big-number">0</div>
+    </div>
+
+    <div class="card">
+        <div class="card-label">Sensor L2</div>
+        <div id="l2" class="big-number">0</div>
+    </div>
+
+    <div class="card">
+        <div class="card-label">Sensor L3</div>
+        <div id="l3" class="big-number">0</div>
+    </div>
+
+</div>
+
+<script>
+const statusColors = {
+    NORMAL:     "status-normal",
+    UNBALANCED: "status-warning",
+    FALLING:    "status-danger",
+    CRITICAL:   "status-critical",
+};
+
+var socket = io();
+
+socket.on("update", function(data) {
+    document.getElementById("l1").innerText   = data.l1;
+    document.getElementById("l2").innerText   = data.l2;
+    document.getElementById("l3").innerText   = data.l3;
+    document.getElementById("risk").innerText = (data.risk ?? 0) + "%";
+    document.getElementById("time").innerText = data.time ?? "--";
+
+    const statusEl = document.getElementById("status");
+    statusEl.innerText = data.state || data.status;
+    statusEl.className = "status-badge " + (statusColors[data.state] || "status-normal");
+
+    const alertEl = document.getElementById("fall-alert");
+    alertEl.style.display = (data.state === "FALLING" || data.state === "CRITICAL")
+        ? "block" : "none";
+});
+</script>
+
+{% endblock %}

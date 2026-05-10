@@ -1,0 +1,309 @@
+/* ══════════════════════════════════════════════════════════
+   AIoT Fall Detection — Global Stylesheet
+   ══════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f0f2f5;
+    color: #1a1a2e;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────── */
+.sidebar {
+    width: 220px;
+    height: 100vh;
+    background: #1a1a2e;
+    color: #fff;
+    position: fixed;
+    top: 0; left: 0;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sidebar h2 {
+    font-size: 1.1rem;
+    color: #60a5fa;
+    margin: 0 0 20px 0;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.sidebar a {
+    display: block;
+    color: #cbd5e1;
+    padding: 10px 12px;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    transition: background 0.15s, color 0.15s;
+}
+
+.sidebar a:hover { background: #334155; color: #fff; }
+.sidebar a.active { background: #2563eb; color: #fff; }
+.sidebar a.logout { margin-top: auto; color: #f87171; }
+.sidebar a.logout:hover { background: #450a0a; }
+
+/* ── Main content area ───────────────────────────────────── */
+.main {
+    margin-left: 220px;
+    padding: 28px 32px;
+    min-height: 100vh;
+}
+
+.main h2 {
+    margin-top: 0;
+    font-size: 1.5rem;
+    color: #1e3a5f;
+}
+
+/* ── Cards ────────────────────────────────────────────────── */
+.card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.07);
+}
+
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.card-label {
+    font-size: 0.78rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 8px;
+}
+
+.big-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1e3a5f;
+}
+
+/* ── Status badges ────────────────────────────────────────── */
+.status-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: .5px;
+}
+
+.status-normal   { background: #dcfce7; color: #166534; }
+.status-warning  { background: #fef9c3; color: #854d0e; }
+.status-danger   { background: #fee2e2; color: #991b1b; }
+.status-critical { background: #450a0a; color: #fca5a5; animation: pulse 1s infinite; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .6; }
+}
+
+/* ── Fall alert banner ────────────────────────────────────── */
+.fall-alert {
+    background: #dc2626;
+    color: #fff;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 1rem;
+    animation: pulse 1s infinite;
+    margin-bottom: 16px;
+}
+
+/* ── Auth pages ───────────────────────────────────────────── */
+body.auth-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+}
+
+.auth-box {
+    background: #fff;
+    border-radius: 16px;
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.25);
+}
+
+.auth-box h2 { margin-top: 0; color: #1e3a5f; }
+.auth-sub    { color: #64748b; margin: -8px 0 20px; font-size: .9rem; }
+
+.auth-box input {
+    display: block;
+    width: 100%;
+    padding: 11px 14px;
+    margin-bottom: 12px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: .95rem;
+    outline: none;
+    transition: border-color .15s;
+}
+
+.auth-box input:focus { border-color: #2563eb; }
+
+.show-pw-label {
+    font-size: .85rem;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 16px;
+    cursor: pointer;
+
+    user-select: none;
+}
+
+.show-pw-label input {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    accent-color: #2563eb;
+}
+
+
+.auth-box button {
+    width: 100%;
+    padding: 12px;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+    margin-bottom: 8px;
+}
+
+.auth-box button:hover { background: #1d4ed8; }
+.auth-footer { text-align: center; color: #64748b; font-size: .88rem; }
+.auth-footer a { color: #2563eb; }
+
+.error-msg   { background: #fee2e2; color: #991b1b; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: .9rem; }
+.success-msg { background: #dcfce7; color: #166534; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: .9rem; }
+
+/* ── Live page ────────────────────────────────────────────── */
+.live-layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.live-feed {
+    flex: 1;
+    position: relative;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.live-feed img {
+    width: 100%;
+    display: block;
+    border-radius: 12px;
+}
+
+.cam-label {
+    position: absolute;
+    bottom: 10px; left: 12px;
+    background: rgba(0,0,0,.55);
+    color: #fff;
+    font-size: .75rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.live-panel {
+    width: 240px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.07);
+}
+
+.live-panel h3 { margin-top: 0; color: #1e3a5f; }
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 7px 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: .92rem;
+}
+
+.info-label { color: #64748b; }
+
+/* ── Profile table ────────────────────────────────────────── */
+.profile-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.profile-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: .95rem;
+}
+
+.profile-table td:first-child {
+    color: #64748b;
+    width: 120px;
+    font-weight: 500;
+}
+
+.btn-logout {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #dc2626;
+    color: #fff;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: background .15s;
+}
+
+.btn-logout:hover { background: #b91c1c; }
+
+/* ── Event replay table ───────────────────────────────────── */
+.event-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,.07);
+}
+
+.event-table th {
+    background: #1e3a5f;
+    color: #fff;
+    padding: 12px 14px;
+    text-align: left;
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+
+.event-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: .9rem;
+}
+
+.event-table tr:last-child td { border-bottom: none; }
+.event-table tr:nth-child(even) { background: #f8fafc; }
