@@ -1,29 +1,19 @@
-import random
-import time
+from .pose_detection import PoseDetector
+from .fall_detection import FallDetector
+from .emergency_detection import EmergencyDetector
+
 
 class AIPipeline:
 
     def __init__(self):
-        self.last_state = "NORMAL"
+        self.pose_detector = PoseDetector()
+        self.fall_detector = FallDetector()
+        self.emergency_detector = EmergencyDetector()
 
     def process(self, frame):
 
-        # =====================
-        # MOCK AI LOGIC
-        # =====================
+        frame, landmarks = self.pose_detector.detect(frame)
+        fall_flag, severity = self.fall_detector.detect(landmarks)
+        emergency_level = self.emergency_detector.classify(fall_flag, severity)
 
-        # giả lập xác suất té ngã
-        fall_prob = random.random()
-
-        if fall_prob < 0.05:
-            fall_flag = True
-            severity = random.randint(2, 4)
-        elif fall_prob < 0.15:
-            fall_flag = True
-            severity = 1
-        else:
-            fall_flag = False
-            severity = 0
-
-        # return frame + AI result
-        return frame, fall_flag, severity
+        return frame, fall_flag, severity, emergency_level

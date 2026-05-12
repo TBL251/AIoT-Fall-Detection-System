@@ -4,19 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}AIoT Fall Detection{% endblock %}</title>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <link rel="stylesheet" href="/static/style.css">
+    {% block head_scripts %}{% endblock %}
 </head>
 
 <body>
 
 <div class="sidebar">
     <h2>AIoT&nbsp;ICU</h2>
-    <a href="/dashboard"  class="{% if request.path == '/dashboard' %}active{% endif %}">📊 Dashboard</a>
-    <a href="/charts"     class="{% if request.path == '/charts'    %}active{% endif %}">📈 Charts</a>
-    <a href="/live"       class="{% if request.path == '/live'      %}active{% endif %}">🎥 Live</a>
-    <a href="/replay"     class="{% if request.path == '/replay'    %}active{% endif %}">🔁 Replay</a>
-    <a href="/profile"    class="{% if request.path == '/profile'   %}active{% endif %}">👤 Profile</a>
+    <a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}">📊 Dashboard</a>
+    <a href="/charts"    class="{% if request.path == '/charts'    %}active{% endif %}">📈 Charts</a>
+    <a href="/live"      class="{% if request.path == '/live'      %}active{% endif %}">🎥 Live</a>
+    <a href="/replay"    class="{% if request.path == '/replay'    %}active{% endif %}">🔁 Replay</a>
+    <a href="/profile"   class="{% if request.path == '/profile'   %}active{% endif %}">👤 Profile</a>
     <a href="/logout" class="logout">🚪 Logout</a>
 </div>
 

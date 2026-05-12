@@ -64,10 +64,9 @@ function showError(msg) {
     el.style.display = "block";
 }
 
-// Allow pressing Enter to submit
-document.addEventListener("keydown", e => {
-    if (e.key === "Enter") doLogin();
-});
+// Allow pressing Enter on email/password fields to submit
+document.getElementById("email").addEventListener("keydown",    e => { if (e.key === "Enter") doLogin(); });
+document.getElementById("password").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
 </script>
 </body>
 </html>

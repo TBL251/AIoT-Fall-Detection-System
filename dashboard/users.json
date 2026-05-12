@@ -1,6 +1,7 @@
 {
-    "gAAAAABp_4dwRlaVWqLp4tMFsMB5xCnZ0FI5zc-QZ9TjraHbu2NV_Yke_QI1ImIpMGWzPKgMxeSAFyWb-HUnZwyW1bWyVb4u4G4CpC-GFkAg9pKSTaTKXIU=": {
-        "name": "gAAAAABp_4dw-FSokYfB4iN2pqwcGhCmd5YysXAXHJ22ESuteAyzWZc8jClAgvYdl_RqJntSEnkrujhdwkCY5I0Jvt9cK7m_Ig==",
-        "password": "scrypt:32768:8:1$8blaKtCZ00qLYbFh$bb449c65dfc77038023a9e3c518ec0690593f3be4e4a1aaedf8d8dc7ff5e73ba1f2bd324489dfa3e7847955b3d0dd4aedae239d769b3b953a315a0e6bf3c12d8"
+    "gAAAAABqAuIFtVBo2SDO-brmZqNF652FF0XtM-6VXxogD4vrXMX3ulx2tBn6ng1nLX_BXithcpdahC4ADDkBhFqfAT9INcL59wDPr9z0yGbo8w6qBZKansA=": {
+        "name": "gAAAAABqAuIFsVRxFfTdB3kUbsOkBI_VnK3Lzt2ng_vJ063-0BCi48twu3EHikorNNrpCYX2sYJ1vlJ1p_SEC7sCF9qjmLoNug==",
+        "password": "scrypt:32768:8:1$ldUYSYBom6yKpLbo$9bda5e9aa42db2c0554ce4a0d4f53634041513cbeadb4d1b83f1cc7a2ed614576d066a40d16f694dc581ef60fbcc66dfbe68502165f686f599bfe8592ac3d92a",
+        "is_logged_in": true
     }
 }

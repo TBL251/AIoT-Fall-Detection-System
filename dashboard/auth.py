@@ -18,11 +18,13 @@ def create_user_folder(email: str):
         safe_email
     )
 
-    emergency_folder = os.path.join(user_folder, "emergency")
-    normal_folder = os.path.join(user_folder, "normal")
+    low_folder = os.path.join(user_folder, "Minor")
+    medium_folder = os.path.join(user_folder, "Dangerous")
+    critical_folder = os.path.join(user_folder, "Critical Emergency")
 
-    os.makedirs(emergency_folder, exist_ok=True)
-    os.makedirs(normal_folder, exist_ok=True)
+    os.makedirs(low_folder, exist_ok=True)
+    os.makedirs(medium_folder, exist_ok=True)
+    os.makedirs(critical_folder, exist_ok=True)
 
     print("CREATED:", user_folder)
 
@@ -31,7 +33,7 @@ def create_user_folder(email: str):
 
 def login_user(email: str) -> None:
     session["user"] = email
-    session.permanent = True
+    session.permanent = False
 
 
 def logout_user() -> None:

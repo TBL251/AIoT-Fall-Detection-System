@@ -1,14 +1,32 @@
+import sys
+import os
 
-from flask import Flask, render_template, redirect
-from flask import request, jsonify, Response, session
+sys.path.append(
+    os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            ".."
+        )
+    )
+)
+
+from flask import (
+    Flask,
+    render_template,
+    redirect,
+    request,
+    jsonify,
+    Response,
+    session
+)
 
 from flask_socketio import SocketIO
+from flask import send_from_directory
 
 import random
 import cv2
 import time
 import json
-import os
 import re
 
 from werkzeug.security import (
@@ -41,6 +59,10 @@ app = Flask(__name__)
 
 app.secret_key = "aiot_fall_detection_2024"
 
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SECURE"] = False
+
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
@@ -66,6 +88,9 @@ USERS_FILE = os.path.join(
     "users.json"
 )
 
+# =============================================================================
+# LOAD USERS
+# =============================================================================
 
 def load_users():
 
@@ -95,6 +120,9 @@ def load_users():
 
         return {}
 
+# =============================================================================
+# SAVE USERS
+# =============================================================================
 
 def save_users(users_data):
 
@@ -111,7 +139,6 @@ def save_users(users_data):
             ensure_ascii=False
         )
 
-
 users = load_users()
 
 # =============================================================================
@@ -124,6 +151,9 @@ def valid_email(email):
 
     return re.match(pattern, email)
 
+# =============================================================================
+# EMAIL EXISTS
+# =============================================================================
 
 def email_exists(email):
 
@@ -131,9 +161,7 @@ def email_exists(email):
 
         try:
 
-            real_email = decrypt_text(
-                enc_email
-            )
+            real_email = decrypt_text(enc_email)
 
             if real_email == email:
                 return True
@@ -143,6 +171,9 @@ def email_exists(email):
 
     return False
 
+# =============================================================================
+# GET USER
+# =============================================================================
 
 def get_user_by_email(email):
 
@@ -150,9 +181,7 @@ def get_user_by_email(email):
 
         try:
 
-            real_email = decrypt_text(
-                enc_email
-            )
+            real_email = decrypt_text(enc_email)
 
             if real_email == email:
                 return user_data
@@ -162,9 +191,19 @@ def get_user_by_email(email):
 
     return None
 
+# =============================================================================
+# REQUIRE LOGIN
+# =============================================================================
+
+def require_login():
+
+    if not is_login():
+        return redirect("/")
+
+    return None
 
 # =============================================================================
-# AUTH ROUTES
+# HOME
 # =============================================================================
 
 @app.route("/")
@@ -175,13 +214,16 @@ def index():
 
     return render_template("login.html")
 
-
 # =============================================================================
 # LOGIN
 # =============================================================================
 
 @app.route("/login", methods=["POST"])
 def do_login():
+
+    global users
+
+    users = load_users()
 
     data = request.get_json()
 
@@ -228,11 +270,33 @@ def do_login():
 
     login_user(email)
 
+    # reset login state
+    for enc_email in users:
+
+        users[enc_email]["is_logged_in"] = False
+
+    # current login
+    for enc_email in users:
+
+        try:
+
+            real_email = decrypt_text(enc_email)
+
+            if real_email == email:
+
+                users[enc_email]["is_logged_in"] = True
+
+        except:
+            pass
+
+    save_users(users)
+
+    print(f"[LOGIN] {email}")
+
     return jsonify({
         "ok": True,
         "msg": "Login success"
     })
-
 
 # =============================================================================
 # REGISTER PAGE
@@ -244,7 +308,6 @@ def register_page():
     return render_template(
         "register.html"
     )
-
 
 # =============================================================================
 # SEND OTP
@@ -299,35 +362,23 @@ def route_send_otp():
             "msg": "Failed to send OTP"
         })
 
-
 # =============================================================================
-# VERIFY OTP + REGISTER
+# VERIFY OTP
 # =============================================================================
 
 @app.route("/verify-otp", methods=["POST"])
 def route_verify_otp():
 
+    global users
+
+    users = load_users()
+
     data = request.get_json()
 
-    email = data.get(
-        "email",
-        ""
-    ).strip()
-
-    otp = data.get(
-        "otp",
-        ""
-    ).strip()
-
-    name = data.get(
-        "name",
-        "User"
-    ).strip()
-
-    pw = data.get(
-        "password",
-        ""
-    ).strip()
+    email = data.get("email", "").strip()
+    otp = data.get("otp", "").strip()
+    name = data.get("name", "User").strip()
+    pw = data.get("password", "").strip()
 
     if not email or not otp or not pw:
 
@@ -350,38 +401,38 @@ def route_verify_otp():
             "msg": "Email already exists"
         })
 
-    hashed_password = generate_password_hash(
-        pw
-    )
+    hashed_password = generate_password_hash(pw)
 
-    encrypted_email = encrypt_text(
-        email
-    )
+    encrypted_email = encrypt_text(email)
 
-    encrypted_name = encrypt_text(
-        name
-    )
+    encrypted_name = encrypt_text(name)
+
+    # logout all users
+    for enc_email in users:
+
+        users[enc_email]["is_logged_in"] = False
 
     users[encrypted_email] = {
 
         "name": encrypted_name,
 
-        "password": hashed_password
+        "password": hashed_password,
+
+        "is_logged_in": True
     }
 
     save_users(users)
-    
+
     create_user_folder(email)
 
-    print("USER SAVED:", email)
-
     login_user(email)
+
+    print(f"[REGISTER] {email}")
 
     return jsonify({
         "ok": True,
         "msg": "Register success"
     })
-
 
 # =============================================================================
 # LOGOUT
@@ -390,25 +441,35 @@ def route_verify_otp():
 @app.route("/logout")
 def logout():
 
+    global users
+
+    users = load_users()
+
+    current_user = session.get("user")
+
+    for enc_email in users:
+
+        try:
+
+            real_email = decrypt_text(enc_email)
+
+            if real_email == current_user:
+
+                users[enc_email]["is_logged_in"] = False
+
+        except:
+            pass
+
+    save_users(users)
+
     logout_user()
+
+    print("[LOGOUT]")
 
     return redirect("/")
 
-
 # =============================================================================
-# LOGIN CHECK
-# =============================================================================
-
-def require_login():
-
-    if not is_login():
-        return redirect("/")
-
-    return None
-
-
-# =============================================================================
-# PAGES
+# DASHBOARD
 # =============================================================================
 
 @app.route("/dashboard")
@@ -418,14 +479,12 @@ def dashboard():
         "dashboard.html"
     )
 
-
 @app.route("/charts")
 def charts():
 
     return require_login() or render_template(
         "charts.html"
     )
-
 
 @app.route("/live")
 def live():
@@ -434,14 +493,12 @@ def live():
         "live.html"
     )
 
-
 @app.route("/replay")
 def replay():
 
     return require_login() or render_template(
         "replay.html"
     )
-
 
 @app.route("/profile")
 def profile():
@@ -453,9 +510,7 @@ def profile():
 
     user_name = "Unknown"
 
-    user_data = get_user_by_email(
-        current_user
-    )
+    user_data = get_user_by_email(current_user)
 
     if user_data:
 
@@ -477,13 +532,11 @@ def profile():
         user_name=user_name
     )
 
-
 # =============================================================================
-# ESP32 VIDEO STREAM
+# VIDEO STREAM
 # =============================================================================
 
 ESP32_STREAM_URL = "http://192.168.1.100/stream"
-
 
 def gen_frames():
 
@@ -544,7 +597,6 @@ def gen_frames():
 
         time.sleep(0.05)
 
-
 @app.route("/video")
 def video():
 
@@ -555,7 +607,6 @@ def video():
         gen_frames(),
         mimetype="multipart/x-mixed-replace; boundary=frame"
     )
-
 
 # =============================================================================
 # REALTIME ENGINE
@@ -620,7 +671,6 @@ def realtime_engine():
 
         socketio.sleep(2)
 
-
 @socketio.on("connect")
 def handle_connect():
 
@@ -634,7 +684,102 @@ def handle_connect():
 
         engine_started = True
 
+# =============================================================================
+# REPLAY API
+# =============================================================================
 
+BASE_RECORDED_FOLDER = os.path.abspath(
+    os.path.join(
+        BASE_DIR,
+        "..",
+        "recorded_videos"
+    )
+)
+
+
+@app.route("/api/replays")
+def api_replays():
+
+    if not is_login():
+        return jsonify([])
+
+    email = session.get("user", "")
+
+    safe_email = (
+        email
+        .replace("@", "_")
+        .replace(".", "_")
+    )
+
+    user_folder = os.path.join(
+        BASE_RECORDED_FOLDER,
+        safe_email
+    )
+
+    result = []
+
+    if not os.path.exists(user_folder):
+        return jsonify(result)
+
+    levels = [
+        "Minor",
+        "Dangerous",
+        "Critical Emergency"
+    ]
+
+    for level in levels:
+
+        level_path = os.path.join(
+            user_folder,
+            level
+        )
+
+        if not os.path.exists(level_path):
+            continue
+
+        for file in os.listdir(level_path):
+
+            if file.endswith(".mp4"):
+
+                result.append({
+
+                    "level": level,
+
+                    "file": file,
+
+                    "url": f"/recorded/{safe_email}/{level}/{file}"
+                })
+
+    # newest first
+    result.reverse()
+
+    return jsonify(result)
+
+
+# =============================================================================
+# VIDEO STREAM FILE
+# =============================================================================
+
+@app.route(
+    "/recorded/<user>/<level>/<filename>"
+)
+def recorded_video(
+    user,
+    level,
+    filename
+):
+
+    folder = os.path.join(
+        BASE_RECORDED_FOLDER,
+        user,
+        level
+    )
+
+    return send_from_directory(
+        folder,
+        filename
+    )
+    
 # =============================================================================
 # RUN
 # =============================================================================
@@ -643,7 +788,6 @@ if __name__ == "__main__":
 
     import webbrowser
     from threading import Timer
-    import os
 
     def open_browser():
 
@@ -651,7 +795,6 @@ if __name__ == "__main__":
             "http://127.0.0.1:5000"
         )
 
-    # chỉ mở 1 lần
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
 
         Timer(

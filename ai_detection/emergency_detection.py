@@ -5,11 +5,11 @@ class EmergencyDetector:
         if not fall_flag:
             return 0
 
-        if severity == 3:
-            return 3  # critical emergency
+        if severity >= 3:
+            return 3   # critical emergency
         elif severity == 2:
-            return 2  # dangerous
+            return 2   # dangerous
         elif severity == 1:
-            return 1  # minor fall
+            return 1   # minor fall
 
         return 0

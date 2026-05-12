@@ -1,4 +1,4 @@
-from ai_detection.utils import calculate_angle
+from .utils import calculate_angle
 
 
 class FallDetector:
@@ -16,7 +16,7 @@ class FallDetector:
         left_hip = landmarks[23]
         right_hip = landmarks[24]
 
-        # center body
+        # center of body (shoulder midpoint → hip midpoint)
         sx = (left_shoulder.x + right_shoulder.x) / 2
         sy = (left_shoulder.y + right_shoulder.y) / 2
 
@@ -25,12 +25,12 @@ class FallDetector:
 
         angle = calculate_angle(sx, sy, hx, hy)
 
-        # logic fall
+        # fall severity thresholds based on body tilt angle
         if angle > 65:
-            return True, 3  # critical
+            return True, 3   # critical
         elif angle > 45:
-            return True, 2  # danger
+            return True, 2   # dangerous
         elif angle > 30:
-            return True, 1  # minor
+            return True, 1   # minor
 
         return False, 0

@@ -1,37 +1,117 @@
 import serial
+import time
 
 
 class ESP32Controller:
 
-    def __init__(self, port="COM3", baudrate=115200):
+    def __init__(
+        self,
+        port="COM3",
+        baudrate=115200
+    ):
+
+        self.port = port
+
+        self.baudrate = baudrate
+
+        self.ser = None
+
+        self.connect()
+
+    # ======================
+    # CONNECT ESP32
+    # ======================
+
+    def connect(self):
+
         try:
-            self.ser = serial.Serial(port, baudrate)
-        except:
+
+            self.ser = serial.Serial(
+                self.port,
+                self.baudrate,
+                timeout=1
+            )
+
+            time.sleep(2)
+
+            print(
+                f"[ESP32] Connected {self.port}"
+            )
+
+        except Exception as e:
+
             self.ser = None
-            print("[ESP32] Not connected")
+
+            print(
+                "[ESP32] Not connected:",
+                e
+            )
+
+    # ======================
+    # SEND ALERT
+    # ======================
 
     def send_alert(self, severity):
 
         if self.ser is None:
+
+            print(
+                "[ESP32] Serial unavailable"
+            )
+
             return
 
-        if severity >= 3:
-            self.ser.write(b"1")  # bật buzzer
-        else:
-            self.ser.write(b"0")  # tắt buzzer
-def send_alert(self, severity):
+        try:
 
-    if self.ser is None:
-        return
+            # ======================
+            # LEVEL MAPPING
+            # ======================
 
-    if severity == 0:
-        self.ser.write(b"0")
+            if severity == 0:
 
-    elif severity == 1:
-        self.ser.write(b"1")
+                signal = b"0"
 
-    elif severity == 2:
-        self.ser.write(b"2")
+                print(
+                    "[ESP32] NORMAL"
+                )
 
-    elif severity == 3:
-        self.ser.write(b"3")
+            elif severity == 1:
+
+                signal = b"1"
+
+                print(
+                    "[ESP32] MINOR FALL"
+                )
+
+            elif severity == 2:
+
+                signal = b"2"
+
+                print(
+                    "[ESP32] DANGEROUS FALL"
+                )
+
+            else:
+
+                signal = b"3"
+
+                print(
+                    "[ESP32] CRITICAL EMERGENCY"
+                )
+
+            # ======================
+            # SEND SERIAL
+            # ======================
+
+            self.ser.write(signal)
+
+            self.ser.flush()
+
+        except Exception as e:
+
+            print(
+                "[ESP32 ERROR]",
+                e
+            )
+
+            self.ser = None

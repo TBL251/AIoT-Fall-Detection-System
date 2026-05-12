@@ -1,78 +1,148 @@
-import cv2
 import time
 import threading
-import os
 
 from services.local_storage import save_video
 from services.firebase_service import save_event
-from services.telegram_service import send_image, send_video, send_alert
+
+from services.telegram_service import (
+    send_video,
+    send_alert
+)
+
 from services.esp32_service import ESP32Controller
 
 
 class EventManager:
 
     def __init__(self):
+
         self.frames = []
+
         self.recording = False
+
+        self.max_frames = 120
+
+        self.lock = threading.Lock()
+
         self.esp32 = ESP32Controller()
 
     # =====================
-    # RECORD FRAME BUFFER
+    # FRAME BUFFER
     # =====================
+
     def add_frame(self, frame):
 
-        if not self.recording:
-            self.recording = True
-            self.frames = []
+        with self.lock:
 
-        self.frames.append(frame)
+            frame_copy = frame.copy()
 
-    # =====================
-    # SAVE SNAPSHOT IMAGE
-    # =====================
-    def save_snapshot(self, frame):
+            self.frames.append(frame_copy)
 
-        os.makedirs("temp", exist_ok=True)
+            # limit RAM
+            if len(self.frames) > self.max_frames:
 
-        path = f"temp/fall_{int(time.time())}.jpg"
-        cv2.imwrite(path, frame)
-
-        return path
+                self.frames.pop(0)
 
     # =====================
-    # HANDLE EVENT (MAIN)
+    # MAIN EVENT
     # =====================
-    def handle_event(self, frame, severity):
 
-        # 1. snapshot
-        image_path = self.save_snapshot(frame)
+    def handle_event(
+        self,
+        frame,
+        severity,
+        email
+    ):
 
-        # 2. send image immediately
-        send_image(image_path, f"⚠️ Fall detected - Level {severity}")
+        # avoid duplicate trigger
+        if self.recording:
+            return
 
-        # 3. start recording
-        self.add_frame(frame)
+        self.recording = True
 
-        # 4. async process
+        print(
+            f"[EVENT] FALL DETECTED LEVEL {severity}"
+        )
+
+        # =====================
+        # BACKGROUND WORKER
+        # =====================
+
         def worker():
 
-            time.sleep(3)
+            try:
 
-            video_path = save_video(self.frames)
+                # keep recording
+                time.sleep(3)
 
-            # firebase
-            save_event("Fall Detection", severity, video_path)
+                with self.lock:
 
-            # telegram video
-            if video_path:
-                send_video(video_path)
+                    frames_copy = self.frames.copy()
 
-            # alert text
-            send_alert(severity)
+                # =====================
+                # SAVE VIDEO
+                # =====================
 
-            # esp32
-            self.esp32.send_alert(severity)
+                video_path = save_video(
+                    frames=frames_copy,
+                    email=email,
+                    severity=severity
+                )
 
-            print("[EVENT] Completed")
+                # =====================
+                # FIREBASE
+                # =====================
 
-        threading.Thread(target=worker).start()
+                save_event(
+                    "Fall Detection",
+                    severity,
+                    video_path
+                )
+
+                # =====================
+                # TELEGRAM VIDEO
+                # =====================
+
+                if video_path:
+
+                    send_video(
+                        video_path,
+                        f"⚠️ Fall Level {severity}"
+                    )
+
+                # =====================
+                # TEXT ALERT
+                # =====================
+
+                send_alert(severity)
+
+                # =====================
+                # ESP32
+                # =====================
+
+                self.esp32.send_alert(
+                    severity
+                )
+
+                print("[EVENT COMPLETED]")
+
+            except Exception as e:
+
+                print("[EVENT ERROR]", e)
+
+            finally:
+
+                self.recording = False
+
+                with self.lock:
+
+                    self.frames.clear()
+
+        # =====================
+        # START THREAD
+        # =====================
+
+        threading.Thread(
+            target=worker,
+            daemon=True
+        ).start()

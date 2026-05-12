@@ -23,7 +23,7 @@
         <input type="checkbox" onchange="togglePw()"> Show password
     </label>
 
-    <button onclick="sendOTP()">Send OTP</button>
+    <button id="otp-btn" onclick="sendOTP()">Send OTP</button>
 
     <div id="otp-section" style="display:none; margin-top:12px">
         <input id="otp" type="text" placeholder="Enter 6-digit OTP" maxlength="6">
@@ -69,6 +69,9 @@ async function sendOTP() {
     if (data.ok) {
         showMsg("OTP sent! Check the server console.", false);
         document.getElementById("otp-section").style.display = "block";
+        const btn = document.getElementById("otp-btn");
+        btn.disabled     = true;
+        btn.textContent  = "OTP Sent";
     } else {
         showMsg(data.msg || "Failed to send OTP.");
     }
@@ -96,6 +99,11 @@ async function verify() {
         showMsg(data.msg || "Verification failed.");
     }
 }
+// Enter on main fields → send OTP; Enter on OTP field → verify
+["name","email","password","confirm"].forEach(id => {
+    document.getElementById(id).addEventListener("keydown", e => { if (e.key === "Enter") sendOTP(); });
+});
+document.getElementById("otp").addEventListener("keydown", e => { if (e.key === "Enter") verify(); });
 </script>
 </body>
 </html>

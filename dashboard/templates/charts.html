@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% block head_scripts %}<script src="https://cdn.socket.io/4.7.2/socket.io.min.js" defer></script>{% endblock %}
 {% block title %}Charts — AIoT{% endblock %}
 {% block content %}
 
@@ -30,7 +31,7 @@ const barChart = new Chart(document.getElementById("chart"), {
     },
     options: {
         animation: { duration: 300 },
-        scales: { y: { beginAtZero: true, max: 10 } },
+        scales: { y: { beginAtZero: true } },
         plugins: { legend: { display: false } },
     }
 });
@@ -51,7 +52,7 @@ const lineChart = new Chart(document.getElementById("lineChart"), {
     },
     options: {
         animation: { duration: 0 },
-        scales: { y: { beginAtZero: true, max: 10 } },
+        scales: { y: { beginAtZero: true } },
     }
 });
 
@@ -66,9 +67,9 @@ socket.on("update", function(data) {
     // Append to history
     const ts = data.time || new Date().toLocaleTimeString();
     history.labels.push(ts);
-    history.l1.push(data.l1);
-    history.l2.push(data.l2);
-    history.l3.push(data.l3);
+    history.l1.push(data.l1 ?? 0);
+    history.l2.push(data.l2 ?? 0);
+    history.l3.push(data.l3 ?? 0);
 
     if (history.labels.length > MAX_POINTS) {
         history.labels.shift();
