@@ -1,13 +1,10 @@
 from cryptography.fernet import Fernet
+from dotenv import load_dotenv
+import os
 
-# =========================================================
-# IMPORTANT:
-# Generate ONE key only.
-# Keep this key forever.
-# If changed -> old users cannot decrypt anymore.
-# =========================================================
+load_dotenv()
 
-SECRET_KEY = b'Q7z9rjv7vQ8b2xWz4QkYjK9y8Y4Nf1Y5JmV0aBcDeFg='
+SECRET_KEY = os.getenv("SECRET_KEY").encode()
 
 cipher = Fernet(SECRET_KEY)
 
