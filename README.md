@@ -1,223 +1,322 @@
-# 🧠 AIoT Fall Detection & Emergency Severity System
+AIoT Fall Detection & ICU Monitoring System
 
-Hệ thống AIoT giám sát con người theo thời gian thực, phát hiện té ngã và phân loại mức độ nguy hiểm (Normal → Critical Emergency).  
-Hệ thống kết hợp AI (MediaPipe + OpenCV), IoT (ESP32), Firebase (metadata), Telegram Bot và Local Storage.
+An intelligent AIoT-based ICU patient monitoring and fall detection system using Artificial Intelligence, Computer Vision, IoT, Firebase, Telegram, and ESP32.
 
----
+System Features
+AI Fall Detection
+Human pose detection
+Real-time fall detection
+ICU monitoring logic
+Risk score analysis
+Severity classification
+Severity Levels
+Level	Description
+1	Minor Fall
+2	Dangerous Fall
+3	Critical Emergency
+ICU Monitoring Engine
 
-# 🚀 Features
+The system continuously monitors patient posture and movement.
 
-## 🧠 AI Detection
-- Real-time human pose estimation (MediaPipe)
-- Fall detection based on:
-  - Body angle
-  - Movement speed
-  - Posture change over time
+ICU State Machine
+NORMAL
+   ↓
+UNBALANCED
+   ↓
+FALLING
+   ↓
+LYING_MONITORING
+   ↓
+CRITICAL ALERT
+Risk Score System
+Dynamic risk scoring
+Continuous monitoring
+Automatic recovery detection
+Cooldown protection
+Realtime Dashboard
 
-## ⚠️ Severity Classification
-- Level 0: Normal
-- Level 1: Minor Fall (có thể tự đứng dậy)
-- Level 2: Dangerous Fall (cần hỗ trợ)
-- Level 3: Critical Emergency (nghi ngờ: co giật / đột quỵ / bất động lâu)
+Modern production-style dashboard with:
 
-## 📹 Video System
-- Tự động ghi video khi có sự kiện
-- Lưu hoàn toàn LOCAL (edge device)
-- Không upload video lên cloud → tối ưu tốc độ
+Realtime monitoring
+Live statistics
+Live risk analysis
+Realtime charts
+Event replay
+User management
+Dashboard Pages
+Dashboard
 
-## ☁️ Cloud (Firebase)
-- Chỉ lưu metadata:
-  - event type
-  - severity level
-  - timestamp
-  - video path (local)
+Main overview page including:
 
-## 📲 Notification System
-- Telegram Bot gửi cảnh báo realtime
-- ESP32 buzzer kích hoạt khi Level 3
+Weekly fall chart
+Live status cards
+Risk indicators
+Quick navigation
+Live Monitoring
 
-## 🌐 Dashboard
-- Xem lịch sử sự kiện
-- Xem video đã lưu
-- Hiển thị mức độ nguy hiểm
+Realtime ICU monitoring interface:
 
----
+Live camera feed
+Patient state
+Risk score
+Fall prediction
+Emergency level
+Replay Center
 
-# 🏗️ System Architecture
+Automatically loads videos from:
 
-Camera (Webcam)  
-↓  
-OpenCV + MediaPipe (Pose Estimation)  
-↓  
-Fall Detection Engine  
-↓  
-Severity Classification (0–3)  
-↓  
-Event Manager  
-↓  
-- Local Storage (Video Recording)  
-- Firebase (Event Metadata)  
-- Telegram Bot (Alert System)  
-- ESP32 (Buzzer Alarm)  
-↓  
-Web Dashboard
+recorded_videos/
 
----
+Replay features:
 
-# 📁 Project Structure
+Severity filtering
+Video playback
+Event history
+Timestamp tracking
+Charts
 
-```text
+Realtime analytics page:
+
+Weekly statistics
+Severity comparison
+Historical data
+Dynamic charts
+Profile
+
+Displays user information:
+
+Full name
+Email
+Date of birth
+Account information
+Authentication System
+Register
+
+Features:
+
+OTP email verification
+Password confirmation
+Secure account creation
+User folder creation
+Registration Fields
+Full name
+Date of birth
+Email
+Password
+Confirm password
+OTP verification
+Login
+
+Features:
+
+Password hashing
+Session authentication
+Show/hide password
+Auto redirect
+Logout
+
+Features:
+
+Session cleanup
+Automatic redirect
+User state reset
+Realtime Communication
+
+Built using:
+
+Flask-SocketIO
+Event streaming
+Live updates
+Instant synchronization
+Telegram Alert System
+
+Automatically sends:
+
+Emergency alerts
+Fall notifications
+Event videos
+Critical warnings
+ESP32 Alarm System
+
+ESP32 buzzer supports multiple emergency levels.
+
+Level	Alarm Type
+0	OFF
+1	Slow Beep
+2	Fast Beep
+3	Continuous Alarm
+Firebase Integration
+
+Stores:
+
+Fall events
+Severity level
+Video paths
+Timestamps
+Realtime logs
+Project Structure
 AIoT-Fall-Detection-System/
-├── main.py
-├── requirements.txt
-├── README.md
-├── .gitignore
 │
 ├── ai_detection/
 │   ├── pipeline.py
-│   ├── pose_detection.py
-│   ├── fall_detection.py
-│   ├── emergency_detection.py
-│   └── utils.py
+│   ├── pose_detector.py
+│   ├── fall_detector.py
+│   └── severity_estimator.py
+│
+├── dashboard/
+│   ├── app.py
+│   ├── auth.py
+│   ├── mail.py
+│   ├── otp_store.py
+│   ├── security.py
+│   ├── users.json
+│   │
+│   ├── .env
+│   │
+│   └── templates/
+│       ├── layout.html
+│       ├── login.html
+│       ├── register.html
+│       ├── dashboard.html
+│       ├── charts.html
+│       ├── replay.html
+│       ├── live.html
+│       └── profile.html
 │
 ├── services/
+│   ├── .env
+│   ├── shared_state.py
 │   ├── local_storage.py
 │   ├── firebase_service.py
 │   ├── telegram_service.py
 │   ├── esp32_service.py
 │   └── event_manager.py
 │
-├── dashboard/
-│   ├── app.py
-│   ├── api.py
-│   ├── templates/
-│   │   └── index.html
-│   └── static/
-│       ├── style.css
-│       └── script.js
-│
-├── esp32/
-│   └── main.ino
-│
 ├── recorded_videos/
-│   ├── emergency/
-│   └── normal/
 │
-├── dataset/
-│   ├── fall/
-│   └── normal/
-│
-├── config/
-│   └── settings.py
-│
-└── docs/
-    └── system_diagram.png
-```
+├── main.py
+├── requirements.txt
+└── README.md
+Environment Files
 
----
+The system uses 2 separate .env files.
 
-# ⚙️ Installation
+dashboard/.env
 
-## 1. Clone project
-```bash
-git clone https://github.com/TBL251/AIoT-Fall-Detection-System.git
+Used for:
+
+OTP email system
+Flask secret keys
+Dashboard security
+
+Example:
+
+MAIL_USERNAME=your_email@gmail.com
+MAIL_PASSWORD=your_app_password
+SECRET_KEY=your_secret_key
+services/.env
+
+Used for:
+
+Telegram bot
+Firebase
+ESP32 services
+
+Example:
+
+BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+CHAT_ID=YOUR_CHAT_ID
+
+FIREBASE_KEY=firebase_key.json
+DATABASE_URL=https://your-project.firebaseio.com/
+Installation
+1. Clone Project
+git clone <your-repository>
 cd AIoT-Fall-Detection-System
-```
-
-
-2. Install dependencies
-```
+2. Create Virtual Environment
+Windows
+python -m venv venv
+venv\Scripts\activate
+Linux / Mac
+python3 -m venv venv
+source venv/bin/activate
+3. Install Requirements
 pip install -r requirements.txt
-```
+4. Configure Environment Variables
 
+Create:
 
-▶️ Run System
-```
+dashboard/.env
+services/.env
+5. Run Dashboard
+python dashboard/app.py
+
+Open browser:
+
+http://127.0.0.1:5000
+6. Run AI Monitoring System
+
+Open another terminal:
+
 python main.py
-```
+Recorded Videos
 
+Videos are automatically stored by:
 
-🧠 System Workflow
-```
-Webcam capture realtime video
-MediaPipe detect human pose
-AI analyzes posture + movement
-System classifies severity level
-If event detected:
-Save video locally
-Save metadata to Firebase
-Send Telegram alert
-Trigger ESP32 buzzer
-Dashboard displays results
-```
+user
+severity
+timestamp
 
+Example:
 
-📊 Severity Levels
-```text
-Level	Name	Description	Action
-0	Normal	No issue	No action
-1	Minor Fall	Slight imbalance	UI warning
-2	Dangerous Fall	Needs assistance	Telegram alert
-3	Critical Emergency	Possible stroke / seizure / unconscious	Full alert system
-```
+recorded_videos/
+└── user_gmail_com/
+    ├── Minor/
+    ├── Dangerous/
+    └── Critical Emergency/
+Technologies Used
+Python
+Flask
+Flask-SocketIO
+OpenCV
+MediaPipe
+Firebase
+Telegram Bot API
+ESP32
+HTML
+CSS
+JavaScript
+Security Features
+Password hashing
+OTP verification
+Email encryption
+Secure session login
+Protected routes
+Future Improvements
+YOLO-based detection
+Cloud deployment
+Multi-camera support
+Mobile application
+AI prediction system
+Medical analytics
+Doctor notification system
+Edge AI optimization
+System Workflow
+Camera
+   ↓
+AI Detection
+   ↓
+Risk Analysis
+   ↓
+ICU Decision Engine
+   ↓
+Alert System
+   ├── Dashboard
+   ├── Firebase
+   ├── Telegram
+   └── ESP32 Alarm
+Author
 
-💾 Storage Design
+AIoT ICU Monitoring & Fall Detection System
 
-📌 Local Storage (Main)
-recorded_videos/emergency/
-recorded_videos/normal/
-📌 Firebase (Metadata only)
-```
-{
-  "event": "FALL",
-  "severity": 3,
-  "timestamp": "2026-05-09 10:30:00",
-  "video_path": "recorded_videos/emergency/fall_001.mp4"
-}
-```
-
-
-📲 Telegram Alert Example
-```
-⚠️ CRITICAL EMERGENCY DETECTED
-Severity: Level 3
-Time: 10:30:00
-```
-
-
-🔔 ESP32 Module
-- Receives signal from system
-- Activates buzzer for Level 3 only
-
-
-🌐 Dashboard Features
-- Event history tracking
-- Video playback (local)
-- Severity visualization
-- System monitoring
-
-
-🛠️ Tech Stack
-- Python
-- OpenCV
-- MediaPipe
-- Flask
-- Firebase
-- Telegram Bot API
-- ESP32 
-
-
-🎯 Project Goal
-
-- Build a real-time AIoT system that can:
-
-  - Detect human falls
-  - Classify emergency severity levels
-  - Trigger multi-channel alerts
-  - Operate efficiently using local-first video processing
-
-
-👨‍💻 Notes
-- System optimized for edge computing
-- Video stored locally for performance
-- Firebase used only for lightweight metadata
+Built using AI + IoT + Computer Vision + Realtime Monitoring.
