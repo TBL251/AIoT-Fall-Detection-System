@@ -1,262 +1,122 @@
-# AIoT Fall Detection & ICU Monitoring System
+# AIoT Fall Detection System
 
-An intelligent AIoT-based ICU patient monitoring and fall detection system using Artificial Intelligence, Computer Vision, IoT, Firebase, Telegram, and ESP32.
+AI-powered IoT Fall Detection & Emergency Monitoring System using:
+
+* Python
+* OpenCV
+* MediaPipe
+* Flask Dashboard
+* Telegram Bot
+* Firebase
+* ESP32 Alarm Controller
+
+The system detects human falls in realtime, records emergency videos, stores them automatically, and sends alerts through Telegram and ESP32 devices.
 
 ---
 
-# System Features
+# Features
 
 ## AI Fall Detection
 
-* Human pose detection
-* Real-time fall detection
-* ICU monitoring logic
-* Risk score analysis
-* Severity classification
+* Realtime pose estimation using MediaPipe
+* Fall state analysis
+* Risk score calculation
+* Severity classification:
 
-### Severity Levels
-
-| Level | Description        |
-| ----- | ------------------ |
-| 1     | Minor Fall         |
-| 2     | Dangerous Fall     |
-| 3     | Critical Emergency |
+  * Minor
+  * Dangerous
+  * Critical Emergency
 
 ---
 
-# ICU Monitoring Engine
+## Smart Emergency Recording
 
-The system continuously monitors patient posture and movement.
+The system records automatically when a fall is detected.
 
-### ICU State Machine
+Recording logic:
 
 ```text
-NORMAL
-   ↓
-UNBALANCED
-   ↓
-FALLING
-   ↓
-LYING_MONITORING
-   ↓
-CRITICAL ALERT
+FALL DETECTED
+    ↓
+Start Recording
+    ↓
+Danger ?
+ ├── YES → Continue Recording
+ └── NO
+        ↓
+   Wait Recovery Time
+        ↓
+Normal stable ?
+ ├── YES → Stop Recording
+ └── NO → Continue Recording
 ```
 
-### Risk Score System
+---
 
-* Dynamic risk scoring
-* Continuous monitoring
-* Automatic recovery detection
-* Cooldown protection
+## Telegram Integration
+
+* Instant emergency alerts
+* Inline video playback in Telegram
+* Recovery video delivery
+* Emergency notifications
 
 ---
 
-# Realtime Dashboard
+## ESP32 Integration
 
-Modern production-style dashboard with:
-
-* Realtime monitoring
-* Live statistics
-* Live risk analysis
-* Realtime charts
-* Event replay
-* User management
+* LED / buzzer emergency alarm
+* Serial communication
+* Emergency level synchronization
 
 ---
 
-# Dashboard Pages
+## Flask Dashboard
 
-## Dashboard
+Web dashboard with:
 
-Main overview page including:
-
-* Weekly fall chart
-* Live status cards
-* Risk indicators
-* Quick navigation
-
----
-
-## Live Monitoring
-
-Realtime ICU monitoring interface:
-
-* Live camera feed
-* Patient state
-* Risk score
-* Fall prediction
-* Emergency level
+* Login/Register
+* Live camera monitoring
+* Realtime AI status
+* Replay recorded videos
+* Charts & statistics
+* User profile system
 
 ---
 
-## Replay Center
+## Firebase Support
 
-Automatically loads videos from:
-
-```bash
-recorded_videos/
-```
-
-Replay features:
-
-* Severity filtering
-* Video playback
-* Event history
-* Timestamp tracking
-
----
-
-## Charts
-
-Realtime analytics page:
-
-* Weekly statistics
-* Severity comparison
-* Historical data
-* Dynamic charts
-
----
-
-## Profile
-
-Displays user information:
-
-* Full name
-* Email
-* Date of birth
-* Account information
-
----
-
-# Authentication System
-
-## Register
-
-Features:
-
-* OTP email verification
-* Password confirmation
-* Secure account creation
-* User folder creation
-
-### Registration Fields
-
-* Full name
-* Date of birth
-* Email
-* Password
-* Confirm password
-* OTP verification
-
----
-
-## Login
-
-Features:
-
-* Password hashing
-* Session authentication
-* Show/hide password
-* Auto redirect
-
----
-
-## Logout
-
-Features:
-
-* Session cleanup
-* Automatic redirect
-* User state reset
-
----
-
-# Realtime Communication
-
-Built using:
-
-* Flask-SocketIO
-* Event streaming
-* Live updates
-* Instant synchronization
-
----
-
-# Telegram Alert System
-
-Automatically sends:
-
-* Emergency alerts
-* Fall notifications
-* Event videos
-* Critical warnings
-
----
-
-# ESP32 Alarm System
-
-ESP32 buzzer supports multiple emergency levels.
-
-| Level | Alarm Type       |
-| ----- | ---------------- |
-| 0     | OFF              |
-| 1     | Slow Beep        |
-| 2     | Fast Beep        |
-| 3     | Continuous Alarm |
-
----
-
-# Firebase Integration
-
-Stores:
-
-* Fall events
-* Severity level
-* Video paths
-* Timestamps
-* Realtime logs
+* Event storage
+* Cloud synchronization
+* Emergency history logging
 
 ---
 
 # Project Structure
 
-```bash
+```text
 AIoT-Fall-Detection-System/
 │
 ├── ai_detection/
 │   ├── pipeline.py
 │   ├── pose_detector.py
 │   ├── fall_detector.py
-│   └── severity_estimator.py
+│   └── utils.py
 │
 ├── dashboard/
+│   ├── templates/
+│   ├── static/
 │   ├── app.py
 │   ├── auth.py
 │   ├── mail.py
-│   ├── otp_store.py
-│   ├── security.py
-│   ├── users.json
-│   │
-│   ├── .env
-│   │
-│   └── templates/
-│       ├── layout.html
-│       ├── login.html
-│       ├── register.html
-│       ├── dashboard.html
-│       ├── charts.html
-│       ├── replay.html
-│       ├── live.html
-│       └── profile.html
+│   └── security.py
 │
 ├── services/
-│   ├── .env
-│   ├── shared_state.py
+│   ├── event_manager.py
 │   ├── local_storage.py
-│   ├── firebase_service.py
 │   ├── telegram_service.py
+│   ├── firebase_service.py
 │   ├── esp32_service.py
-│   └── event_manager.py
+│   └── shared_state.py
 │
 ├── recorded_videos/
 │
@@ -267,71 +127,27 @@ AIoT-Fall-Detection-System/
 
 ---
 
-# Environment Files
-
-The system uses 2 separate `.env` files.
-
----
-
-## dashboard/.env
-
-Used for:
-
-* OTP email system
-* Flask secret keys
-* Dashboard security
-
-Example:
-
-```env
-MAIL_USERNAME=your_email@gmail.com
-MAIL_PASSWORD=your_app_password
-SECRET_KEY=your_secret_key
-```
-
----
-
-## services/.env
-
-Used for:
-
-* Telegram bot
-* Firebase
-* ESP32 services
-
-Example:
-
-```env
-BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
-CHAT_ID=YOUR_CHAT_ID
-
-FIREBASE_KEY=firebase_key.json
-DATABASE_URL=https://your-project.firebaseio.com/
-```
-
----
-
 # Installation
 
 ## 1. Clone Project
 
 ```bash
-git clone <your-repository>
+git clone https://github.com/TBL251/AIoT-Fall-Detection-System.git
 cd AIoT-Fall-Detection-System
 ```
 
 ---
 
-# 2. Create Virtual Environment
+## 2. Create Virtual Environment
 
-## Windows
+### Windows
 
 ```bash
 python -m venv venv
 venv\Scripts\activate
 ```
 
-## Linux / Mac
+### Linux / Mac
 
 ```bash
 python3 -m venv venv
@@ -340,7 +156,7 @@ source venv/bin/activate
 
 ---
 
-# 3. Install Requirements
+## 3. Install Requirements
 
 ```bash
 pip install -r requirements.txt
@@ -348,24 +164,57 @@ pip install -r requirements.txt
 
 ---
 
-# 4. Configure Environment Variables
+# FFmpeg Installation
 
-Create:
+FFmpeg is required for:
+
+* H264 encoding
+* Telegram inline playback
+* Fast MP4 optimization
+
+## Download
+
+Official site:
+https://ffmpeg.org/download.html
+
+Windows build:
+https://www.gyan.dev/ffmpeg/builds/
+
+---
+
+## Verify Installation
 
 ```bash
-dashboard/.env
-services/.env
+ffmpeg -version
 ```
 
 ---
 
-# 5. Run Dashboard
+# Environment Variables
+
+Create `.env` file:
+
+```env
+BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+CHAT_ID=YOUR_CHAT_ID
+
+MAIL_USERNAME=YOUR_EMAIL
+MAIL_PASSWORD=YOUR_PASSWORD
+
+FIREBASE_CREDENTIALS=YOUR_FIREBASE_JSON
+```
+
+---
+
+# Running The System
+
+## Start Dashboard
 
 ```bash
 python dashboard/app.py
 ```
 
-Open browser:
+Dashboard:
 
 ```text
 http://127.0.0.1:5000
@@ -373,9 +222,7 @@ http://127.0.0.1:5000
 
 ---
 
-# 6. Run AI Monitoring System
-
-Open another terminal:
+## Start AI Engine
 
 ```bash
 python main.py
@@ -383,87 +230,142 @@ python main.py
 
 ---
 
-# Recorded Videos
+# Telegram Bot Setup
 
-Videos are automatically stored by:
+## Create Bot
 
-* user
-* severity
-* timestamp
+Open:
+https://t.me/BotFather
 
-Example:
+Command:
 
-```bash
+```text
+/newbot
+```
+
+Copy the bot token.
+
+---
+
+## Get Chat ID
+
+Open:
+https://t.me/getmyid_bot
+
+---
+
+# Video Storage Structure
+
+```text
 recorded_videos/
-└── user_gmail_com/
+│
+└── user_email/
     ├── Minor/
     ├── Dangerous/
     └── Critical Emergency/
 ```
+
+Example:
+
+```text
+recorded_videos/tbl1240_gmail_com/Critical Emergency/event_20260519_120000.mp4
+```
+
+---
+
+# AI Pipeline
+
+Current version uses:
+
+* MediaPipe pose estimation
+* Angle calculation
+* State machine logic
+
+Future upgrade:
+
+* Deep Learning model
+* YOLO / LSTM / CNN
+* Custom AI training dataset
+
+---
+
+# Current Detection Logic
+
+The system currently detects:
+
+* Body angle
+* Sudden vertical collapse
+* Long lying duration
+* Movement recovery
+
+---
+
+# Future AI Training Plan
+
+Planned upgrade:
+
+* Collect dataset
+* Train custom fall detection model
+* Replace mathematical heuristics
+* Deploy optimized AI inference
+
+Suggested models:
+
+* YOLOv8 Pose
+* LSTM Action Recognition
+* MoveNet
+* TensorFlow Lite
+
+---
+
+# Performance Optimization
+
+Optimizations included:
+
+* FPS limiter
+* Realtime frame buffering
+* FFmpeg pipe encoding
+* Telegram streaming support
+* Async recording
+* Reduced camera lag
 
 ---
 
 # Technologies Used
 
 * Python
-* Flask
-* Flask-SocketIO
 * OpenCV
 * MediaPipe
+* Flask
+* SocketIO
 * Firebase
 * Telegram Bot API
+* FFmpeg
 * ESP32
-* HTML
-* CSS
-* JavaScript
+* TensorFlow Lite
 
 ---
 
 # Security Features
 
 * Password hashing
+* Encrypted emails
+* Session management
 * OTP verification
-* Email encryption
-* Secure session login
-* Protected routes
+* Secure Telegram token storage
 
 ---
 
-# Future Improvements
+# License
 
-* YOLO-based detection
-* Cloud deployment
-* Multi-camera support
-* Mobile application
-* AI prediction system
-* Medical analytics
-* Doctor notification system
-* Edge AI optimization
-
----
-
-# System Workflow
-
-```text
-Camera
-   ↓
-AI Detection
-   ↓
-Risk Analysis
-   ↓
-ICU Decision Engine
-   ↓
-Alert System
-   ├── Dashboard
-   ├── Firebase
-   ├── Telegram
-   └── ESP32 Alarm
-```
+MIT License
 
 ---
 
 # Author
 
-AIoT ICU Monitoring & Fall Detection System
+Developed by:
+TBL251
 
-Built using AI + IoT + Computer Vision + Realtime Monitoring.
+GitHub:
+https://github.com/TBL251/AIoT-Fall-Detection-System
