@@ -1,15 +1,22 @@
+import cv2
 import time
 import threading
 
 from services.local_storage import save_video
-from services.firebase_service import save_event
+
+from services.firebase_service import (
+    save_event
+)
 
 from services.telegram_service import (
     send_video,
-    send_alert
+    send_alert,
+    send_message
 )
 
-from services.esp32_service import ESP32Controller
+from services.esp32_service import (
+    ESP32Controller
+)
 
 
 class EventManager:
@@ -18,131 +25,269 @@ class EventManager:
 
         self.frames = []
 
+        self.lock = threading.Lock()
+
         self.recording = False
 
-        self.max_frames = 120
+        self.current_email = None
 
-        self.lock = threading.Lock()
+        self.current_severity = 0
+
+        self.video_sent = False
+
+        self.start_time = None
+
+        self.last_danger_time = None
+
+        self.last_video_time = 0
 
         self.esp32 = ESP32Controller()
 
-    # =====================
-    # FRAME BUFFER
-    # =====================
+    # ====================================
+    # PROPERTY
+    # ====================================
+
+    @property
+    def is_recording(self):
+
+        return self.recording
+
+    # ====================================
+    # ADD FRAME
+    # ====================================
 
     def add_frame(self, frame):
 
         with self.lock:
 
-            frame_copy = frame.copy()
+            small = cv2.resize(
+                frame,
+                (640, 360)
+            )
 
-            self.frames.append(frame_copy)
+            self.frames.append(
+                small
+            )
 
-            # limit RAM
-            if len(self.frames) > self.max_frames:
+            # keep latest frames
+            if len(self.frames) > 300:
 
                 self.frames.pop(0)
 
-    # =====================
-    # MAIN EVENT
-    # =====================
+    # ====================================
+    # START RECORDING
+    # ====================================
 
-    def handle_event(
+    def start_recording(
         self,
-        frame,
         severity,
-        email
+        email=None
     ):
 
-        # avoid duplicate trigger
-        if self.recording:
-            return
+        current_time = time.time()
 
-        self.recording = True
+        if email is not None:
 
-        print(
-            f"[EVENT] FALL DETECTED LEVEL {severity}"
-        )
+            self.current_email = email
 
-        # =====================
-        # BACKGROUND WORKER
-        # =====================
+        # FIRST DETECTION
+        if not self.recording:
 
-        def worker():
+            print("[REC] START RECORDING")
 
-            try:
+            self.recording = True
 
-                # keep recording
-                time.sleep(3)
+            self.start_time = current_time
 
-                with self.lock:
+            self.video_sent = False
 
-                    frames_copy = self.frames.copy()
+            self.current_severity = severity
 
-                # =====================
-                # SAVE VIDEO
-                # =====================
+            # ALERTS
+            if severity >= 2:
 
-                video_path = save_video(
-                    frames=frames_copy,
-                    email=email,
-                    severity=severity
-                )
+                threading.Thread(
 
-                # =====================
-                # FIREBASE
-                # =====================
+                    target=send_alert,
 
-                save_event(
-                    "Fall Detection",
-                    severity,
-                    video_path
-                )
+                    args=(severity,),
 
-                # =====================
-                # TELEGRAM VIDEO
-                # =====================
+                    daemon=True
 
-                if video_path:
-
-                    send_video(
-                        video_path,
-                        f"⚠️ Fall Level {severity}"
-                    )
-
-                # =====================
-                # TEXT ALERT
-                # =====================
-
-                send_alert(severity)
-
-                # =====================
-                # ESP32
-                # =====================
+                ).start()
 
                 self.esp32.send_alert(
                     severity
                 )
 
-                print("[EVENT COMPLETED]")
+            elif severity == 1:
 
-            except Exception as e:
+                threading.Thread(
 
-                print("[EVENT ERROR]", e)
+                    target=send_message,
 
-            finally:
+                    args=(
+                        "⚠️ Minor fall detected",
+                    ),
 
-                self.recording = False
+                    daemon=True
 
-                with self.lock:
+                ).start()
 
-                    self.frames.clear()
+        self.last_danger_time = current_time
 
-        # =====================
-        # START THREAD
-        # =====================
+        self.current_severity = max(
+            self.current_severity,
+            severity
+        )
 
-        threading.Thread(
-            target=worker,
-            daemon=True
-        ).start()
+        # ====================================
+        # AUTO SEND VIDEO
+        # ====================================
+
+        if (
+            severity >= 3
+            and not self.video_sent
+        ):
+
+            lying_time = (
+                current_time - self.start_time
+            )
+
+            if lying_time > 15:
+
+                print(
+                    "[CRITICAL] AUTO SEND VIDEO"
+                )
+
+                # LOCK BEFORE SEND
+                self.video_sent = True
+
+                threading.Thread(
+                    target=self.send_emergency_video,
+                    daemon=True
+                ).start()
+
+    # ====================================
+    # SEND EMERGENCY VIDEO
+    # ====================================
+
+    def send_emergency_video(self):
+
+        now = time.time()
+
+        # ANTI SPAM
+        if now - self.last_video_time < 60:
+
+            print("[ANTI SPAM] Skip video")
+
+            return
+
+        self.last_video_time = now
+
+        with self.lock:
+
+            frames_copy = (
+                self.frames.copy()
+            )
+
+        final_email = (
+            self.current_email
+            or "unknown@gmail.com"
+        )
+
+        video_path = save_video(
+            frames_copy,
+            final_email,
+            self.current_severity
+        )
+
+        if video_path:
+
+            send_message(
+                "🚨 PATIENT NOT RECOVERING"
+            )
+
+            send_video(
+                video_path,
+                "🚨 Emergency ICU Video"
+            )
+
+            print(
+                "[TELEGRAM] Emergency video sent"
+            )
+
+    # ====================================
+    # STOP + SAVE
+    # ====================================
+
+    def stop_and_save(self):
+
+        with self.lock:
+
+            frames_copy = (
+                self.frames.copy()
+            )
+
+        final_email = (
+            self.current_email
+        )
+
+        if final_email is None:
+
+            print(
+                "[SAVE ERROR] No email"
+            )
+
+            return
+
+        video_path = save_video(
+            frames_copy,
+            final_email,
+            self.current_severity
+        )
+
+        if video_path:
+
+            save_event(
+                "Fall Detection",
+                self.current_severity,
+                video_path
+            )
+
+            if not self.video_sent:
+
+                self.video_sent = True
+
+                threading.Thread(
+
+                    target=send_video,
+
+                    args=(
+                        video_path,
+                        "📹 Recovery Video"
+                    ),
+
+                    daemon=True
+
+                ).start()
+
+        print("[REC] VIDEO SAVED")
+
+        # RESET ESP32
+        self.esp32.send_alert(0)
+
+        # RESET
+        self.frames.clear()
+
+        self.recording = False
+
+        self.current_severity = 0
+
+        self.start_time = None
+
+        self.last_danger_time = None
+
+        self.video_sent = False
+
+        self.current_email = None

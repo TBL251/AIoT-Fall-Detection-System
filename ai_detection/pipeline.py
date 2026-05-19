@@ -1,19 +1,79 @@
-from .pose_detection import PoseDetector
-from .fall_detection import FallDetector
-from .emergency_detection import EmergencyDetector
+import cv2
+
+from .pose_detection import (
+    PoseDetector
+)
+
+from .fall_detection import (
+    FallDetector
+)
+
+from .emergency_detection import (
+    EmergencyDetector
+)
 
 
 class AIPipeline:
 
     def __init__(self):
-        self.pose_detector = PoseDetector()
-        self.fall_detector = FallDetector()
-        self.emergency_detector = EmergencyDetector()
+
+        self.pose_detector = (
+            PoseDetector()
+        )
+
+        self.fall_detector = (
+            FallDetector()
+        )
+
+        self.emergency_detector = (
+            EmergencyDetector()
+        )
 
     def process(self, frame):
 
-        frame, landmarks = self.pose_detector.detect(frame)
-        fall_flag, severity = self.fall_detector.detect(landmarks)
-        emergency_level = self.emergency_detector.classify(fall_flag, severity)
+        # =========================
+        # SMALL FRAME
+        # =========================
 
-        return frame, fall_flag, severity, emergency_level
+        small = cv2.resize(
+            frame,
+            (640, 360)
+        )
+
+        # =========================
+        # POSE
+        # =========================
+
+        small, landmarks = (
+            self.pose_detector.detect(
+                small
+            )
+        )
+
+        # =========================
+        # FALL DETECTION
+        # =========================
+
+        fall_flag, severity = (
+            self.fall_detector.detect(
+                landmarks
+            )
+        )
+
+        # =========================
+        # EMERGENCY
+        # =========================
+
+        emergency_level = (
+            self.emergency_detector.classify(
+                fall_flag,
+                severity
+            )
+        )
+
+        return (
+            small,
+            fall_flag,
+            severity,
+            emergency_level
+        )

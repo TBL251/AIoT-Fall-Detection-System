@@ -10,20 +10,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv(
+    "BOT_TOKEN"
+)
 
-CHAT_ID = os.getenv("CHAT_ID")
+CHAT_ID = os.getenv(
+    "CHAT_ID"
+)
 
 # ======================
 # VALIDATE
 # ======================
 
 if not BOT_TOKEN:
+
     raise ValueError(
         "Missing BOT_TOKEN in .env"
     )
 
 if not CHAT_ID:
+
     raise ValueError(
         "Missing CHAT_ID in .env"
     )
@@ -37,6 +43,16 @@ BASE_URL = (
 )
 
 # ======================
+# SESSION
+# ======================
+
+session = requests.Session()
+
+session.headers.update({
+    "Connection": "close"
+})
+
+# ======================
 # SEND MESSAGE
 # ======================
 
@@ -44,21 +60,33 @@ def send_message(text):
 
     try:
 
-        url = f"{BASE_URL}/sendMessage"
+        url = (
+            f"{BASE_URL}/sendMessage"
+        )
 
-        response = requests.post(
+        response = session.post(
             url,
             data={
                 "chat_id": CHAT_ID,
                 "text": text
             },
-            timeout=10
+            timeout=30
         )
 
-        print(
-            "[TELEGRAM] Message sent",
-            response.status_code
-        )
+        result = response.json()
+
+        if result.get("ok"):
+
+            print(
+                "[TELEGRAM] Message sent"
+            )
+
+        else:
+
+            print(
+                "[TELEGRAM ERROR]",
+                result
+            )
 
     except Exception as e:
 
@@ -78,7 +106,9 @@ def send_image(
 
     try:
 
-        if not os.path.exists(image_path):
+        if not os.path.exists(
+            image_path
+        ):
 
             print(
                 "[TELEGRAM] Image not found"
@@ -86,11 +116,16 @@ def send_image(
 
             return
 
-        url = f"{BASE_URL}/sendPhoto"
+        url = (
+            f"{BASE_URL}/sendPhoto"
+        )
 
-        with open(image_path, "rb") as img:
+        with open(
+            image_path,
+            "rb"
+        ) as img:
 
-            response = requests.post(
+            response = session.post(
                 url,
                 files={
                     "photo": img
@@ -99,13 +134,23 @@ def send_image(
                     "chat_id": CHAT_ID,
                     "caption": caption
                 },
-                timeout=20
+                timeout=60
             )
 
-        print(
-            "[TELEGRAM] Image sent",
-            response.status_code
-        )
+        result = response.json()
+
+        if result.get("ok"):
+
+            print(
+                "[TELEGRAM] Image sent"
+            )
+
+        else:
+
+            print(
+                "[TELEGRAM IMAGE ERROR]",
+                result
+            )
 
     except Exception as e:
 
@@ -125,7 +170,9 @@ def send_video(
 
     try:
 
-        if not os.path.exists(video_path):
+        if not os.path.exists(
+            video_path
+        ):
 
             print(
                 "[TELEGRAM] Video not found"
@@ -133,25 +180,87 @@ def send_video(
 
             return
 
-        url = f"{BASE_URL}/sendVideo"
-
-        with open(video_path, "rb") as vid:
-
-            response = requests.post(
-                url,
-                files={
-                    "video": vid
-                },
-                data={
-                    "chat_id": CHAT_ID,
-                    "caption": caption
-                },
-                timeout=60
-            )
+        file_size = os.path.getsize(
+            video_path
+        ) / (1024 * 1024)
 
         print(
-            "[TELEGRAM] Video sent",
-            response.status_code
+            f"[VIDEO SIZE] {file_size:.2f} MB"
+        )
+
+        url = (
+            f"{BASE_URL}/sendVideo"
+        )
+
+        for attempt in range(3):
+
+            try:
+
+                print(
+                    f"[TELEGRAM] Upload attempt {attempt + 1}"
+                )
+
+                with open(
+                    video_path,
+                    "rb"
+                ) as vid:
+
+                    response = session.post(
+
+                        url,
+
+                        files={
+                            "video": (
+                                os.path.basename(
+                                    video_path
+                                ),
+                                vid,
+                                "video/mp4"
+                            )
+                        },
+
+                        data={
+
+                            "chat_id": CHAT_ID,
+
+                            "caption": caption,
+
+                            "supports_streaming": True,
+
+                            "disable_notification": False
+                        },
+
+                        timeout=300
+                    )
+
+                result = response.json()
+
+                if result.get("ok"):
+
+                    print(
+                        "[TELEGRAM] Video delivered successfully"
+                    )
+
+                    return
+
+                else:
+
+                    print(
+                        "[TELEGRAM ERROR]",
+                        result
+                    )
+
+            except Exception as e:
+
+                print(
+                    "[TELEGRAM RETRY ERROR]",
+                    e
+                )
+
+            time.sleep(2)
+
+        print(
+            "[TELEGRAM] Failed after retries"
         )
 
     except Exception as e:

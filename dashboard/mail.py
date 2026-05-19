@@ -112,3 +112,5 @@ AIOT Dashboard
 
     except Exception as e:
         logger.error("Failed to send OTP: %s", e)
+print(EMAIL_ADDRESS)
+print(EMAIL_PASSWORD)

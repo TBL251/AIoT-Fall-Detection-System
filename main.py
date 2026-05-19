@@ -4,7 +4,14 @@ import json
 import os
 
 from ai_detection.pipeline import AIPipeline
-from services.event_manager import EventManager
+
+from services.event_manager import (
+    EventManager
+)
+
+from services.camera_thread import (
+    CameraStream
+)
 
 # =========================
 # PATH
@@ -26,7 +33,10 @@ USERS_FILE = os.path.join(
 
 def get_current_logged_user():
 
-    if not os.path.exists(USERS_FILE):
+    if not os.path.exists(
+        USERS_FILE
+    ):
+
         return None
 
     try:
@@ -41,67 +51,76 @@ def get_current_logged_user():
 
         for enc_email, data in users.items():
 
-            if data.get("is_logged_in") is True:
+            if data.get(
+                "is_logged_in"
+            ) is True:
 
-                # lấy email thật
-                from dashboard.security import decrypt_text
+                from dashboard.security import (
+                    decrypt_text
+                )
 
                 try:
 
-                    real_email = decrypt_text(
+                    return decrypt_text(
                         enc_email
                     )
 
-                    return real_email
+                except Exception as e:
 
-                except:
-                    pass
+                    print(
+                        "[DECRYPT ERROR]",
+                        e
+                    )
 
     except Exception as e:
 
-        print("[USER READ ERROR]", e)
+        print(
+            "[USER ERROR]",
+            e
+        )
 
     return None
 
 # =========================
-# INIT SYSTEM
+# INIT
 # =========================
 
 pipeline = AIPipeline()
 
 event_manager = EventManager()
 
-cap = cv2.VideoCapture(0)
+# =========================
+# CAMERA
+# =========================
 
-# camera quality
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+try:
 
-if not cap.isOpened():
+    camera = CameraStream(0)
 
-    print("ERROR: Cannot open camera")
+except Exception as e:
+
+    print(
+        "[CAMERA INIT ERROR]",
+        e
+    )
 
     exit(1)
 
 # =========================
-# ICU VARIABLES
+# STATES
 # =========================
 
 state = "NORMAL"
 
-fall_time = None
-
-lie_time = None
-
 risk_score = 0
 
-cooldown = 0
+recovery_start = None
 
-last_frame_time = 0
+RECOVERY_SECONDS = 5
 
-FPS_LIMIT = 20
-
-print("🏥 ICU MONITORING SYSTEM STARTED")
+print(
+    "🏥 ICU MONITORING SYSTEM STARTED"
+)
 
 # =========================
 # MAIN LOOP
@@ -111,45 +130,61 @@ try:
 
     while True:
 
-        current_time = time.time()
-
         # =========================
-        # FPS LIMITER
+        # GET USER
         # =========================
 
-        if current_time - last_frame_time < 1 / FPS_LIMIT:
-            continue
-
-        last_frame_time = current_time
-
-        # =========================
-        # CURRENT USER
-        # =========================
-
-        current_user = get_current_logged_user()
+        current_user = (
+            get_current_logged_user()
+        )
 
         # =========================
         # READ CAMERA
         # =========================
 
-        ret, frame = cap.read()
+        ret, frame = camera.read()
 
-        if not ret:
-            break
+        if not ret or frame is None:
+
+            print(
+                "[CAMERA] Failed to read frame"
+            )
+
+            time.sleep(1)
+
+            continue
 
         # =========================
         # SAVE BUFFER
         # =========================
 
-        event_manager.add_frame(frame)
-
-        # =========================
-        # AI PIPELINE
-        # =========================
-
-        frame, fall_flag, severity, emergency_level = (
-            pipeline.process(frame)
+        event_manager.add_frame(
+            frame
         )
+
+        # =========================
+        # AI PROCESS
+        # =========================
+
+        try:
+
+            (
+                frame,
+                fall_flag,
+                severity,
+                emergency_level
+            ) = pipeline.process(
+                frame
+            )
+
+        except Exception as e:
+
+            print(
+                "[AI ERROR]",
+                e
+            )
+
+            continue
 
         # =========================
         # RISK SCORE
@@ -157,143 +192,143 @@ try:
 
         if fall_flag:
 
-            risk_score = max(
-                risk_score,
-                severity * 25
+            risk_score = min(
+                100,
+                risk_score + 5
             )
 
         else:
 
             risk_score = max(
                 0,
-                risk_score - 5
+                risk_score - 3
             )
 
         # =========================
-        # STATE MACHINE
+        # FALL DETECTED
         # =========================
 
         if fall_flag:
 
-            if state == "NORMAL":
+            recovery_start = None
 
-                state = "UNBALANCED"
+            state = "FALLING"
 
-                fall_time = current_time
+            if not event_manager.recording:
 
-            elif state == "UNBALANCED":
+                print(
+                    "🚨 FALL DETECTED"
+                )
 
-                if current_time - fall_time > 1.5:
-
-                    state = "FALLING"
-
-            elif state == "FALLING":
-
-                if current_time - fall_time > 3:
-
-                    state = "LYING_MONITORING"
-
-                    lie_time = current_time
-
-        # =========================
-        # ICU ALERT
-        # =========================
-
-        if state == "LYING_MONITORING":
-
-            lie_duration = (
-                current_time - lie_time
-            )
-
-            if (
-                lie_duration > 5
-                and risk_score >= 50
-                and current_time > cooldown
-            ):
-
-                print("🚨 ICU ALERT")
-
-                if current_user is not None:
+                if current_user:
 
                     print(
-                        f"[CURRENT USER] {current_user}"
-                    )
-
-                    event_manager.handle_event(
-                        frame=frame,
-                        severity=emergency_level,
-                        email=current_user
+                        f"[USER] {current_user}"
                     )
 
                 else:
 
                     print(
-                        "No user logged in"
+                        "[WARNING] No user logged in"
                     )
 
-                cooldown = current_time + 10
+            # ALWAYS UPDATE RECORDING
+            event_manager.start_recording(
 
-                state = "NORMAL"
+                severity=emergency_level,
 
-                fall_time = None
-
-                lie_time = None
+                email=current_user
+            )
 
         # =========================
         # RECOVERY
         # =========================
 
-        if not fall_flag:
+        else:
 
-            if risk_score < 30:
+            if event_manager.recording:
 
-                state = "NORMAL"
+                if recovery_start is None:
 
-                fall_time = None
+                    recovery_start = time.time()
 
-                lie_time = None
+                recovery_duration = (
+                    time.time()
+                    - recovery_start
+                )
+
+                if (
+                    recovery_duration
+                    >= RECOVERY_SECONDS
+                ):
+
+                    print(
+                        "✅ RECOVERY STABLE"
+                    )
+
+                    state = "NORMAL"
+
+                    try:
+
+                        event_manager.stop_and_save()
+
+                    except Exception as e:
+
+                        print(
+                            "[SAVE ERROR]",
+                            e
+                        )
+
+                    recovery_start = None
 
         # =========================
-        # UI
+        # DISPLAY INFO
         # =========================
 
         cv2.putText(
+
             frame,
-            f"STATE: {state}",
-            (30, 40),
+
+            f"State: {state}",
+
+            (20, 40),
+
             cv2.FONT_HERSHEY_SIMPLEX,
+
             1,
-            (0, 255, 255),
+
+            (
+                0,
+                255,
+                0
+            ) if state == "NORMAL"
+            else (
+                0,
+                0,
+                255
+            ),
+
             2
         )
 
         cv2.putText(
-            frame,
-            f"RISK SCORE: {risk_score}",
-            (30, 80),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 0, 255),
-            2
-        )
 
-        cv2.putText(
             frame,
-            f"LEVEL: {severity}",
-            (30, 120),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (255, 0, 0),
-            2
-        )
 
-        cv2.putText(
-            frame,
-            f"USER: {current_user}",
-            (30, 160),
+            f"Risk Score: {risk_score}",
+
+            (20, 80),
+
             cv2.FONT_HERSHEY_SIMPLEX,
+
             0.8,
-            (255, 255, 255),
+
+            (
+                255,
+                255,
+                0
+            ),
+
             2
         )
 
@@ -306,14 +341,39 @@ try:
             frame
         )
 
-        # ESC
-        if cv2.waitKey(1) & 0xFF == 27:
+        # =========================
+        # ESC TO EXIT
+        # =========================
+
+        key = cv2.waitKey(1)
+
+        if key & 0xFF == 27:
+
+            print(
+                "[SYSTEM] Exit requested"
+            )
+
             break
 
 finally:
 
-    cap.release()
+    print(
+        "[SYSTEM] Releasing resources..."
+    )
+
+    try:
+
+        camera.release()
+
+    except Exception as e:
+
+        print(
+            "[CAMERA RELEASE ERROR]",
+            e
+        )
 
     cv2.destroyAllWindows()
 
-    print("System stopped")
+    print(
+        "🏥 System stopped"
+    )

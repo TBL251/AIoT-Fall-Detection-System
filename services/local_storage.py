@@ -1,102 +1,233 @@
 import cv2
 import os
 import time
+import subprocess
 
-BASE_DIR = "recorded_videos"
+# =========================
+# BASE PATH
+# =========================
 
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
 
-def save_video(frames, email, severity):
+VIDEOS_DIR = os.path.join(
+    BASE_DIR,
+    "..",
+    "recorded_videos"
+)
 
-    # ======================
-    # EMPTY CHECK
-    # ======================
+os.makedirs(
+    VIDEOS_DIR,
+    exist_ok=True
+)
 
-    if len(frames) == 0:
-        return None
+# =========================
+# FFMPEG PATH
+# =========================
 
-    # ======================
-    # SAFE EMAIL
-    # ======================
+FFMPEG_PATH = r"E:\ffmpeg-8.1.1-essentials_build\ffmpeg-8.1.1-essentials_build\bin\ffmpeg.exe"
 
-    safe_email = (
-        email
-        .replace("@", "_")
-        .replace(".", "_")
-    )
+# =========================
+# GET SEVERITY FOLDER
+# =========================
 
-    # ======================
-    # SEVERITY FOLDER
-    # ======================
+def get_severity_folder(severity):
 
-    if severity == 1:
-
-        level_folder = "Minor"
+    if severity <= 1:
+        return "Minor"
 
     elif severity == 2:
-
-        level_folder = "Dangerous"
+        return "Dangerous"
 
     else:
+        return "Critical Emergency"
 
-        level_folder = "Critical Emergency"
+# =========================
+# SAVE VIDEO
+# =========================
 
-    # ======================
-    # FINAL DIRECTORY
-    # ======================
+def save_video(
+    frames,
+    email,
+    severity
+):
 
-    save_dir = os.path.join(
-        BASE_DIR,
-        safe_email,
-        level_folder
-    )
+    try:
 
-    os.makedirs(
-        save_dir,
-        exist_ok=True
-    )
+        if not frames:
 
-    # ======================
-    # FILE NAME
-    # ======================
+            print("[VIDEO] No frames")
 
-    timestamp = time.strftime(
-        "%Y%m%d_%H%M%S"
-    )
+            return None
 
-    path = os.path.join(
-        save_dir,
-        f"event_{timestamp}.mp4"
-    )
+        # =========================
+        # USER FOLDER
+        # =========================
 
-    # ======================
-    # VIDEO INFO
-    # ======================
+        safe_email = (
+            email
+            .replace("@", "_")
+            .replace(".", "_")
+        )
 
-    h, w, _ = frames[0].shape
+        severity_folder = get_severity_folder(
+            severity
+        )
 
-    fps = 20
+        user_dir = os.path.join(
+            VIDEOS_DIR,
+            safe_email,
+            severity_folder
+        )
 
-    fourcc = cv2.VideoWriter_fourcc(
-        *"mp4v"
-    )
+        os.makedirs(
+            user_dir,
+            exist_ok=True
+        )
 
-    out = cv2.VideoWriter(
-        path,
-        fourcc,
-        fps,
-        (w, h)
-    )
+        # =========================
+        # FILE NAME
+        # =========================
 
-    # ======================
-    # WRITE VIDEO
-    # ======================
+        timestamp = time.strftime(
+            "%Y%m%d_%H%M%S"
+        )
 
-    for frame in frames:
+        raw_path = os.path.join(
+            user_dir,
+            f"raw_{timestamp}.avi"
+        )
 
-        out.write(frame)
+        final_path = os.path.join(
+            user_dir,
+            f"event_{timestamp}.mp4"
+        )
 
-    out.release()
+        # =========================
+        # VIDEO INFO
+        # =========================
 
-    print(f"[VIDEO SAVED] {path}")
+        height, width = frames[0].shape[:2]
 
-    return path
+        fps = 30
+
+        # =========================
+        # SAVE RAW VIDEO
+        # =========================
+
+        fourcc = cv2.VideoWriter_fourcc(
+            *"XVID"
+        )
+
+        writer = cv2.VideoWriter(
+            raw_path,
+            fourcc,
+            fps,
+            (width, height)
+        )
+
+        for frame in frames:
+
+            writer.write(frame)
+
+        writer.release()
+
+        print("[VIDEO] Raw AVI saved")
+
+        # =========================
+        # CHECK FFMPEG
+        # =========================
+
+        if not os.path.exists(
+            FFMPEG_PATH
+        ):
+
+            print(
+                "[FFMPEG] ffmpeg.exe not found"
+            )
+
+            return raw_path
+
+        # =========================
+        # CONVERT TO MP4
+        # =========================
+
+        command = [
+
+            FFMPEG_PATH,
+
+            "-y",
+
+            "-i", raw_path,
+
+            # H264 codec
+            "-c:v", "libx264",
+
+            # Fast encode
+            "-preset", "ultrafast",
+
+            # Telegram compatible
+            "-pix_fmt", "yuv420p",
+
+            # Stream immediately
+            "-movflags", "+faststart",
+
+            # FPS
+            "-r", "30",
+
+            # Optimize size
+            "-crf", "23",
+
+            # no audio
+            "-an",
+
+            final_path
+        ]
+
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        # =========================
+        # CHECK RESULT
+        # =========================
+
+        if result.returncode != 0:
+
+            print("[FFMPEG ERROR]")
+
+            print(
+                result.stderr.decode(
+                    errors="ignore"
+                )
+            )
+
+            return raw_path
+
+        # =========================
+        # DELETE RAW AVI
+        # =========================
+
+        if os.path.exists(raw_path):
+
+            os.remove(raw_path)
+
+        print("[VIDEO] MP4 optimized")
+
+        print(
+            f"[VIDEO PATH] {final_path}"
+        )
+
+        return final_path
+
+    except Exception as e:
+
+        print(
+            "[SAVE VIDEO ERROR]",
+            e
+        )
+
+        return None

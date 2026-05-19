@@ -2,6 +2,11 @@
     "gAAAAABqAuIFtVBo2SDO-brmZqNF652FF0XtM-6VXxogD4vrXMX3ulx2tBn6ng1nLX_BXithcpdahC4ADDkBhFqfAT9INcL59wDPr9z0yGbo8w6qBZKansA=": {
         "name": "gAAAAABqAuIFsVRxFfTdB3kUbsOkBI_VnK3Lzt2ng_vJ063-0BCi48twu3EHikorNNrpCYX2sYJ1vlJ1p_SEC7sCF9qjmLoNug==",
         "password": "scrypt:32768:8:1$ldUYSYBom6yKpLbo$9bda5e9aa42db2c0554ce4a0d4f53634041513cbeadb4d1b83f1cc7a2ed614576d066a40d16f694dc581ef60fbcc66dfbe68502165f686f599bfe8592ac3d92a",
+        "is_logged_in": false
+    },
+    "gAAAAABqC7THfuaspxodOOsqL1qEnLuMPkIqBc3dYt5yhjV9nwCDaaPhXo983c2qcQpBLMXU8yNQEomF8AdRECTT73PFt3Odj7smnoLTWQSFUR3OtnLSVU4=": {
+        "name": "gAAAAABqC7THsQn5SWfKl0zPmhCiA8NjNv1m8fORXU3hEiA4uDYniF1PF32N7-yDAY3XtAYS56xUizIrYKXeNRvbCJciBI7ZOQ==",
+        "password": "scrypt:32768:8:1$SW8pKaWUrxd9Kvmq$1e6c66ebc757fb25aadf3ee988f4d106870da1f6f4fb1d242475e8192823d5e573e6fe9954ce9f0bc9e3efcd363ae5ef1623752bb471607f5bea9952624c0a19",
         "is_logged_in": true
     }
 }
