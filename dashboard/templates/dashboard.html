@@ -1,49 +1,480 @@
 {% extends "layout.html" %}
-{% block head_scripts %}<script src="https://cdn.socket.io/4.7.2/socket.io.min.js" defer></script>{% endblock %}
-{% block title %}Dashboard — AIoT{% endblock %}
+{% block head_scripts %}<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>{% endblock %}
+{% block title %}Dashboard — AIoT ICU{% endblock %}
+{% block page_label %}<span>▦</span> Realtime Dashboard{% endblock %}
 {% block content %}
 
-<h2>📊 Realtime Dashboard</h2>
+<style>
+  /* ── Layout ── */
+  .dash-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    animation: slide-in-up 0.4s ease both;
+  }
 
+  /* ── Top stat row ── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line2);
+    border-radius: var(--radius);
+    padding: 22px 24px 20px;
+    box-shadow: var(--shadow);
+    transition: transform 0.22s cubic-bezier(0.4,0,0.2,1), box-shadow 0.22s, border-color 0.22s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.9) 50%, transparent 100%);
+  }
+
+  .stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: rgba(59,130,246,0.15);
+  }
+
+  .stat-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .stat-label {
+    font-family: 'Sora', sans-serif;
+    font-size: 0.60rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .stat-icon {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+  }
+
+  .stat-icon.blue  { background: rgba(59,130,246,0.10); color: var(--accent); }
+  .stat-icon.green { background: rgba(16,185,129,0.10); color: var(--green); }
+  .stat-icon.amber { background: rgba(245,158,11,0.10); color: var(--amber); }
+  .stat-icon.red   { background: rgba(239,68,68,0.10);  color: var(--red);   }
+
+  .stat-value {
+    font-family: 'Sora', sans-serif;
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .stat-value-unit {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-left: 2px;
+  }
+
+  .stat-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+
+  /* ── AI Status Card (special) ── */
+  .status-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line2);
+    border-radius: var(--radius);
+    padding: 22px 24px 20px;
+    box-shadow: var(--shadow);
+    transition: transform 0.22s ease, box-shadow 0.22s;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .status-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .ai-badge-wrap {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* ── AI Activity Indicator ── */
+  .ai-activity {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 10px;
+    background: rgba(59,130,246,0.07);
+    border: 1px solid rgba(59,130,246,0.14);
+    border-radius: 999px;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .ai-activity-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 10px;
+    margin-right: 4px;
+  }
+
+  .ai-bar {
+    width: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+    animation: ai-bar-bounce 1.2s ease-in-out infinite;
+  }
+
+  .ai-bar:nth-child(1) { height: 4px;  animation-delay: 0s; }
+  .ai-bar:nth-child(2) { height: 8px;  animation-delay: 0.15s; }
+  .ai-bar:nth-child(3) { height: 6px;  animation-delay: 0.30s; }
+  .ai-bar:nth-child(4) { height: 10px; animation-delay: 0.10s; }
+  .ai-bar:nth-child(5) { height: 5px;  animation-delay: 0.25s; }
+
+  @keyframes ai-bar-bounce {
+    0%, 100% { transform: scaleY(0.4); opacity: 0.5; }
+    50%       { transform: scaleY(1);   opacity: 1;   }
+  }
+
+  /* ── Sensor Grid ── */
+  .sensor-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+
+  .sensor-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line2);
+    border-radius: var(--radius);
+    padding: 22px 22px 20px;
+    box-shadow: var(--shadow);
+    transition: transform 0.22s ease, box-shadow 0.22s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sensor-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .sensor-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .sensor-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 0.60rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* Pulse circle indicator */
+  .pulse-ring-wrap {
+    position: relative;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .pulse-ring-inner {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    position: relative;
+    z-index: 1;
+  }
+
+  .pulse-ring-outer {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    opacity: 0;
+    animation: pulse-ring-anim 2s ease-out infinite;
+  }
+
+  @keyframes pulse-ring-anim {
+    0%   { transform: scale(0.5); opacity: 0.5; }
+    100% { transform: scale(1);   opacity: 0; }
+  }
+
+  .sensor-number {
+    font-family: 'Sora', sans-serif;
+    font-size: 3rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    transition: color 0.4s ease;
+  }
+
+  /* Progress bar */
+  .sensor-progress {
+    margin-top: 18px;
+  }
+
+  .sensor-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .sensor-progress-pct {
+    font-family: 'Sora', sans-serif;
+    font-size: 0.70rem;
+  }
+
+  .progress-track {
+    height: 5px;
+    background: rgba(148,163,184,0.12);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 99px;
+    width: 0%;
+    transition: width 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ── Decorative corner accent on cards ── */
+  .sensor-card::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 80px; height: 80px;
+    border-radius: 0 var(--radius) 0 0;
+    opacity: 0.04;
+    background: radial-gradient(circle at top right, currentColor, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── ECG / Waveform decoration (purely decorative) ── */
+  .waveform-wrap {
+    height: 36px;
+    margin-top: 14px;
+    overflow: hidden;
+    opacity: 0.35;
+  }
+
+  .waveform-svg {
+    width: 100%; height: 100%;
+  }
+
+  /* ── Socket error ── */
+  .socket-error-bar {
+    display: none;
+    background: rgba(239,68,68,0.06);
+    border: 1px solid rgba(239,68,68,0.20);
+    border-left: 3px solid var(--red);
+    color: #dc2626;
+    padding: 10px 18px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+
+  @media (max-width: 900px) {
+    .stat-row, .sensor-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 600px) {
+    .stat-row, .sensor-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<!-- Fall Alert -->
 <div id="fall-alert" class="fall-alert" style="display:none">
-    ⚠️ FALL DETECTED — Please check immediately!
+    ⚠ Fall Detected — Immediate Assistance Required
 </div>
 
-<div class="card-grid">
-
-    <div class="card">
-        <div class="card-label">Status</div>
-        <div id="status" class="status-badge status-normal">Normal</div>
-    </div>
-
-    <div class="card">
-        <div class="card-label">Risk Level</div>
-        <div id="risk" class="big-number">0%</div>
-    </div>
-
-    <div class="card">
-        <div class="card-label">Last Update</div>
-        <div id="time" class="big-number">--:--:--</div>
-    </div>
-
+<!-- Socket Error -->
+<div id="socket-error" class="socket-error-bar">
+    ⚠ Connection Lost · Reconnecting…
 </div>
 
-<div class="card-grid" style="margin-top:16px">
+<div class="dash-wrapper">
 
-    <div class="card">
-        <div class="card-label">Sensor L1</div>
-        <div id="l1" class="big-number">0</div>
+  <!-- ── Section: Patient Status ── -->
+  <div class="section-head">Patient Status Overview</div>
+
+  <div class="stat-row">
+
+    <!-- AI Status -->
+    <div class="stat-card">
+      <div class="stat-card-top">
+        <div class="stat-label">AI Status</div>
+        <div class="stat-icon green">◉</div>
+      </div>
+      <div id="status" class="status-badge status-normal" style="font-size:0.78rem;padding:9px 20px;">Normal</div>
+      <div class="ai-badge-wrap">
+        <div class="ai-activity">
+          <div class="ai-activity-bars">
+            <div class="ai-bar"></div>
+            <div class="ai-bar"></div>
+            <div class="ai-bar"></div>
+            <div class="ai-bar"></div>
+            <div class="ai-bar"></div>
+          </div>
+          AI Active
+        </div>
+      </div>
     </div>
 
-    <div class="card">
-        <div class="card-label">Sensor L2</div>
-        <div id="l2" class="big-number">0</div>
+    <!-- Risk Level -->
+    <div class="stat-card">
+      <div class="stat-card-top">
+        <div class="stat-label">Fall Risk Score</div>
+        <div class="stat-icon amber">⚡</div>
+      </div>
+      <div class="stat-value">
+        <span id="risk">0</span><span class="stat-value-unit">%</span>
+      </div>
+      <div class="stat-sub">Confidence threshold: 70%</div>
     </div>
 
-    <div class="card">
-        <div class="card-label">Sensor L3</div>
-        <div id="l3" class="big-number">0</div>
+    <!-- Last Update -->
+    <div class="stat-card">
+      <div class="stat-card-top">
+        <div class="stat-label">Last Update</div>
+        <div class="stat-icon blue">◷</div>
+      </div>
+      <div class="stat-value" id="time" style="font-size:2rem;letter-spacing:0.01em;">--:--:--</div>
+      <div class="stat-sub">Realtime · &lt;1s latency</div>
     </div>
+
+  </div>
+
+  <!-- ── Section: Sensor Channels ── -->
+  <div class="section-head">Sensor Channels</div>
+
+  <div class="sensor-grid">
+
+    <!-- L1 -->
+    <div class="sensor-card">
+      <div class="sensor-card-top">
+        <div class="sensor-title">L1 · Minor Alert</div>
+        <div class="pulse-ring-wrap">
+          <div class="pulse-ring-inner" style="background:var(--blue);box-shadow:0 0 8px rgba(59,130,246,0.6)"></div>
+          <div class="pulse-ring-outer" style="background:rgba(59,130,246,0.25)"></div>
+        </div>
+      </div>
+      <div id="l1" class="sensor-number" style="color:var(--blue)">0</div>
+      <div class="waveform-wrap">
+        <svg class="waveform-svg" viewBox="0 0 200 36" preserveAspectRatio="none" fill="none">
+          <polyline points="0,18 20,18 28,4 36,32 44,18 60,18 68,10 76,26 84,18 120,18 130,6 140,30 150,18 200,18"
+            stroke="rgba(59,130,246,0.6)" stroke-width="1.5" fill="none"/>
+        </svg>
+      </div>
+      <div class="sensor-progress">
+        <div class="sensor-progress-meta">
+          <span>Sensor Threshold</span>
+          <span class="sensor-progress-pct" id="pct-l1">0%</span>
+        </div>
+        <div class="progress-track">
+          <div id="bar-l1" class="progress-fill" style="background:linear-gradient(90deg,rgba(59,130,246,0.5),var(--blue))"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- L2 -->
+    <div class="sensor-card">
+      <div class="sensor-card-top">
+        <div class="sensor-title">L2 · Danger Alert</div>
+        <div class="pulse-ring-wrap">
+          <div class="pulse-ring-inner" style="background:var(--amber);box-shadow:0 0 8px rgba(245,158,11,0.6)"></div>
+          <div class="pulse-ring-outer" style="background:rgba(245,158,11,0.25)"></div>
+        </div>
+      </div>
+      <div id="l2" class="sensor-number" style="color:var(--amber)">0</div>
+      <div class="waveform-wrap">
+        <svg class="waveform-svg" viewBox="0 0 200 36" preserveAspectRatio="none" fill="none">
+          <polyline points="0,18 15,18 22,8 30,28 38,18 55,18 65,5 75,31 82,18 110,18 122,4 134,32 145,18 200,18"
+            stroke="rgba(245,158,11,0.6)" stroke-width="1.5" fill="none"/>
+        </svg>
+      </div>
+      <div class="sensor-progress">
+        <div class="sensor-progress-meta">
+          <span>Sensor Threshold</span>
+          <span class="sensor-progress-pct" id="pct-l2">0%</span>
+        </div>
+        <div class="progress-track">
+          <div id="bar-l2" class="progress-fill" style="background:linear-gradient(90deg,rgba(245,158,11,0.5),var(--amber))"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- L3 -->
+    <div class="sensor-card">
+      <div class="sensor-card-top">
+        <div class="sensor-title">L3 · Critical Alert</div>
+        <div class="pulse-ring-wrap">
+          <div class="pulse-ring-inner" style="background:var(--red);box-shadow:0 0 8px rgba(239,68,68,0.6)"></div>
+          <div class="pulse-ring-outer" style="background:rgba(239,68,68,0.25);animation-duration:1s"></div>
+        </div>
+      </div>
+      <div id="l3" class="sensor-number" style="color:var(--red)">0</div>
+      <div class="waveform-wrap">
+        <svg class="waveform-svg" viewBox="0 0 200 36" preserveAspectRatio="none" fill="none">
+          <polyline points="0,18 12,18 18,6 26,30 34,18 50,18 58,2 68,34 76,18 105,18 118,3 132,33 142,18 200,18"
+            stroke="rgba(239,68,68,0.6)" stroke-width="1.5" fill="none"/>
+        </svg>
+      </div>
+      <div class="sensor-progress">
+        <div class="sensor-progress-meta">
+          <span>Sensor Threshold</span>
+          <span class="sensor-progress-pct" id="pct-l3">0%</span>
+        </div>
+        <div class="progress-track">
+          <div id="bar-l3" class="progress-fill" style="background:linear-gradient(90deg,rgba(239,68,68,0.5),var(--red))"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
 
 </div>
 
@@ -57,21 +488,36 @@ const statusColors = {
 
 var socket = io();
 
+socket.on("connect",       () => { document.getElementById("socket-error").style.display = "none"; });
+socket.on("connect_error", () => { document.getElementById("socket-error").style.display = "flex"; });
+socket.on("disconnect",    () => { document.getElementById("socket-error").style.display = "flex"; });
+
 socket.on("update", function(data) {
-    document.getElementById("l1").innerText   = data.l1 ?? 0;
-    document.getElementById("l2").innerText   = data.l2 ?? 0;
-    document.getElementById("l3").innerText   = data.l3 ?? 0;
-    document.getElementById("risk").innerText = (data.risk ?? 0) + "%";
-    document.getElementById("time").innerText = data.time ?? "--";
+    const l1 = data.l1 ?? 0, l2 = data.l2 ?? 0, l3 = data.l3 ?? 0;
 
-    const state    = data.state || data.status || "NORMAL";
+    document.getElementById("l1").textContent = l1;
+    document.getElementById("l2").textContent = l2;
+    document.getElementById("l3").textContent = l3;
+
+    const risk = data.risk ?? 0;
+    document.getElementById("risk").textContent = risk;
+    document.getElementById("time").textContent  = data.time ?? "--:--:--";
+
+    const p1 = Math.min(l1, 100), p2 = Math.min(l2, 100), p3 = Math.min(l3, 100);
+    document.getElementById("bar-l1").style.width = p1 + "%";
+    document.getElementById("bar-l2").style.width = p2 + "%";
+    document.getElementById("bar-l3").style.width = p3 + "%";
+    document.getElementById("pct-l1").textContent = p1 + "%";
+    document.getElementById("pct-l2").textContent = p2 + "%";
+    document.getElementById("pct-l3").textContent = p3 + "%";
+
+    const state = data.state || data.status || "NORMAL";
     const statusEl = document.getElementById("status");
-    statusEl.innerText = state;
-    statusEl.className = "status-badge " + (statusColors[state] || "status-normal");
+    statusEl.textContent = state;
+    statusEl.className   = "status-badge " + (statusColors[state] || "status-normal");
 
-    const alertEl = document.getElementById("fall-alert");
-    alertEl.style.display = (state === "FALLING" || state === "CRITICAL")
-        ? "block" : "none";
+    document.getElementById("fall-alert").style.display =
+        (state === "FALLING" || state === "CRITICAL") ? "flex" : "none";
 });
 </script>
 

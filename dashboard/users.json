@@ -1,2 +1,7 @@
 {
+    "gAAAAABqDAHT1RDOCt9P4pL0QEkOaGwsuJV5ro12-HgDK2IXOqEBtD3hkrq8gXfmvlurclLIO5Rt-OvyHclL72KQHv-o9XxrYHIfoHjgUf6Wjy5f5Az7nps=": {
+        "name": "gAAAAABqDAHTnWrLq93LPjQPMZCZS9PVk6fn5lI-jq3gySvSrBYbAsiN4zGX5cQ7MCCCln1LyCWlG3F1wVk_LqnbbclC6bidvg==",
+        "password": "scrypt:32768:8:1$0gzlbxGue00G9cSj$f40dc0664d545b365dde98d00568a2b47d71d9a2ac7c1dbe331cb6ba46b8eb638bdd7f6830cdf9e9ca02e7cbe7b695a1429617f71f1997cb5e8ffc34fe56fa2b",
+        "is_logged_in": true
+    }
 }

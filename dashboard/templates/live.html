@@ -1,71 +1,36 @@
 {% extends "layout.html" %}
-{% block head_scripts %}<script src="https://cdn.socket.io/4.7.2/socket.io.min.js" defer></script>{% endblock %}
-{% block title %}Live — AIoT{% endblock %}
+{% block head_scripts %}<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>{% endblock %}
+{% block title %}Live — AIoT ICU{% endblock %}
+{% block page_label %}<span>◉</span> Live Monitoring{% endblock %}
 {% block content %}
 
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;500;700&display=swap');
-
-  :root {
-    --bg:       #0a0c0f;
-    --surface:  #111418;
-    --border:   #1e2329;
-    --accent:   #00e5ff;
-    --warn:     #ffb300;
-    --danger:   #ff3d3d;
-    --critical: #ff006e;
-    --muted:    #4a5568;
-    --text:     #cdd6e0;
-    --mono:     'Share Tech Mono', monospace;
-    --sans:     'Barlow', sans-serif;
-  }
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-  }
-
-  h2 {
-    font-family: var(--mono);
-    font-size: 1rem;
-    letter-spacing: 0.2em;
-    color: var(--accent);
-    text-transform: uppercase;
-    padding: 1.5rem 2rem 0;
-    opacity: 0.7;
-  }
-
+  /* ── Live Layout ── */
   .live-layout {
     display: grid;
-    grid-template-columns: 1fr 280px;
-    gap: 1.5rem;
-    padding: 1.2rem 2rem 2rem;
-    min-height: calc(100vh - 60px);
-    align-items: start;
+    grid-template-columns: 1fr 296px;
+    gap: 20px;
+    height: calc(100vh - var(--topbar-h) - 68px);
+    min-height: 480px;
   }
 
-  /* ── Camera feed ── */
-  .live-feed {
+  /* ── Feed ── */
+  .live-feed-wrap {
     position: relative;
-    background: #000;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     overflow: hidden;
-    aspect-ratio: 4/3;
+    background: #0c1220;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--line2);
   }
 
-  #cam-feed {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
+  .live-feed-inner {
+    width: 100%; height: 100%;
+    position: relative;
   }
 
   /* Scanline overlay */
-  .live-feed::after {
+  .live-feed-wrap::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -73,256 +38,343 @@
       to bottom,
       transparent 0px,
       transparent 3px,
-      rgba(0,0,0,0.08) 3px,
-      rgba(0,0,0,0.08) 4px
+      rgba(0,0,0,0.012) 3px,
+      rgba(0,0,0,0.012) 4px
     );
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  /* Corner bracket decorations */
+  .corner {
+    position: absolute;
+    width: 18px; height: 18px;
+    z-index: 4;
     pointer-events: none;
   }
 
-  .cam-label {
+  .corner-tl { top: 12px; left: 12px; border-top: 2px solid rgba(245,158,11,0.7); border-left: 2px solid rgba(245,158,11,0.7); border-radius: 3px 0 0 0; }
+  .corner-tr { top: 12px; right: 12px; border-top: 2px solid rgba(245,158,11,0.7); border-right: 2px solid rgba(245,158,11,0.7); border-radius: 0 3px 0 0; }
+  .corner-bl { bottom: 12px; left: 12px; border-bottom: 2px solid rgba(245,158,11,0.7); border-left: 2px solid rgba(245,158,11,0.7); border-radius: 0 0 0 3px; }
+  .corner-br { bottom: 12px; right: 12px; border-bottom: 2px solid rgba(245,158,11,0.7); border-right: 2px solid rgba(245,158,11,0.7); border-radius: 0 0 3px 0; }
+
+  /* HUD overlays */
+  .hud-rec {
     position: absolute;
-    bottom: 12px;
-    left: 14px;
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    color: var(--accent);
-    letter-spacing: 0.15em;
-    opacity: 0.6;
+    top: 14px; right: 52px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 5;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.58rem;
+    letter-spacing: 0.20em;
+    color: rgba(239,68,68,0.90);
+    text-transform: uppercase;
+    display: none;
   }
 
-  .rec-dot {
-    position: absolute;
-    top: 12px;
-    right: 14px;
-    width: 8px;
-    height: 8px;
+  .hud-rec::before {
+    content: '';
+    width: 6px; height: 6px;
     border-radius: 50%;
-    background: var(--danger);
-    animation: blink 1.2s ease-in-out infinite;
+    background: var(--red);
+    animation: pulse-dot 1s infinite;
+    box-shadow: 0 0 6px rgba(239,68,68,0.7);
+    flex-shrink: 0;
   }
 
-  @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.1; }
+  .hud-cam-label {
+    position: absolute;
+    bottom: 14px; left: 14px;
+    z-index: 5;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.58rem;
+    letter-spacing: 0.24em;
+    color: rgba(245,158,11,0.85);
+    text-transform: uppercase;
   }
 
-  /* Camera error / off state */
-  .cam-error {
+  /* No signal state */
+  .feed-no-signal {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100%;
-    gap: 10px;
-    color: var(--muted);
-    font-family: var(--mono);
-    font-size: 0.8rem;
-    letter-spacing: 0.1em;
+    gap: 14px;
+    color: rgba(148,163,184,0.35);
+    font-family: 'Sora', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    z-index: 1;
+    position: relative;
   }
 
-  .cam-error svg { opacity: 0.3; }
+  .no-signal-icon {
+    font-size: 2.5rem;
+    opacity: 0.2;
+  }
 
-  /* ── Side panel ── */
+  /* ── Side Panel ── */
   .live-panel {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 14px;
   }
 
-  .live-panel h3 {
-    font-family: var(--mono);
-    font-size: 0.75rem;
-    letter-spacing: 0.2em;
-    color: var(--muted);
+  /* Panel card */
+  .panel-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line2);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+    transition: transform 0.22s ease, box-shadow 0.22s;
+  }
+
+  .panel-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .panel-label {
+    font-family: 'Sora', sans-serif;
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.20em;
+    color: var(--text-muted);
     text-transform: uppercase;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 0.6rem;
+    margin-bottom: 12px;
   }
 
-  /* Status badge */
-  .status-badge {
-    font-family: var(--mono);
-    font-size: 1rem;
-    letter-spacing: 0.2em;
-    padding: 10px 16px;
-    border-radius: 3px;
+  /* Status badge in panel */
+  #state-badge {
+    display: block;
     text-align: center;
-    font-weight: 700;
-    transition: background 0.3s, color 0.3s;
-  }
-
-  .status-normal   { background: rgba(0,229,255,0.08);  color: var(--accent);   border: 1px solid rgba(0,229,255,0.25); }
-  .status-warning  { background: rgba(255,179,0,0.12);  color: var(--warn);     border: 1px solid rgba(255,179,0,0.35); }
-  .status-danger   { background: rgba(255,61,61,0.12);  color: var(--danger);   border: 1px solid rgba(255,61,61,0.35); }
-  .status-critical { background: rgba(255,0,110,0.15);  color: var(--critical); border: 1px solid rgba(255,0,110,0.4);
-                     animation: pulse-critical 0.8s ease-in-out infinite; }
-
-  @keyframes pulse-critical {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255,0,110,0.4); }
-    50%       { box-shadow: 0 0 0 8px rgba(255,0,110,0); }
+    padding: 11px;
+    font-size: 0.78rem;
+    letter-spacing: 0.16em;
+    width: 100%;
   }
 
   /* Info rows */
-  .info-block {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 12px 14px;
-  }
-
   .info-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.85rem;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line);
   }
 
-  .info-label {
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.12em;
-    color: var(--muted);
+  .info-row:last-child { border-bottom: none; }
+
+  .info-key {
+    font-family: 'Sora', sans-serif;
+    font-size: 0.60rem;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
     text-transform: uppercase;
   }
 
   .info-val {
-    font-family: var(--mono);
-    color: var(--text);
+    font-family: 'Sora', sans-serif;
     font-size: 0.9rem;
+    color: var(--text);
+    font-weight: 600;
+    letter-spacing: 0.04em;
   }
 
-  /* Level bars */
-  .level-row { display: flex; flex-direction: column; gap: 5px; }
-  .level-header { display: flex; justify-content: space-between; }
+  /* Sensor rows */
+  .sensor-panel-row {
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
 
-  .level-bar-bg {
+  .sensor-panel-row + .sensor-panel-row {
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+    margin-top: 2px;
+  }
+
+  .sensor-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .sensor-key {
+    font-family: 'Sora', sans-serif;
+    font-size: 0.60rem;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .sensor-val {
+    font-family: 'Sora', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+
+  .mini-track {
     height: 4px;
-    background: var(--border);
-    border-radius: 2px;
+    background: rgba(148,163,184,0.12);
+    border-radius: 99px;
     overflow: hidden;
   }
 
-  .level-bar-fill {
+  .mini-fill {
     height: 100%;
-    border-radius: 2px;
+    border-radius: 99px;
     width: 0%;
-    transition: width 0.4s ease;
-  }
-
-  #bar-l1 { background: var(--accent); }
-  #bar-l2 { background: var(--warn); }
-  #bar-l3 { background: var(--danger); }
-
-  /* Fall alert */
-  .fall-alert {
-    display: none;
-    font-family: var(--mono);
-    font-size: 0.85rem;
-    letter-spacing: 0.15em;
-    color: var(--critical);
-    border: 1px solid var(--critical);
-    background: rgba(255,0,110,0.1);
-    border-radius: 3px;
-    padding: 12px 14px;
-    text-align: center;
-    animation: pulse-critical 0.8s ease-in-out infinite;
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
   }
 
   /* Camera toggle button */
-  .cam-btn {
-    font-family: var(--mono);
-    font-size: 0.75rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    background: transparent;
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    border-radius: 3px;
-    padding: 8px 14px;
-    cursor: pointer;
-    transition: background 0.2s;
+  .cam-toggle-btn {
     width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid var(--line2);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-sub);
+    font-family: 'Sora', sans-serif;
+    font-size: 0.83rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color var(--transition), color var(--transition), background var(--transition), box-shadow var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
 
-  .cam-btn:hover { background: rgba(0,229,255,0.1); }
-  .cam-btn.active { background: rgba(0,229,255,0.15); }
+  .cam-toggle-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(59,130,246,0.05);
+  }
+
+  .cam-toggle-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(59,130,246,0.08);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.08);
+  }
+
+  /* Fall alert in panel */
+  .fall-alert-panel {
+    display: none;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: rgba(239,68,68,0.07);
+    border: 1px solid rgba(239,68,68,0.22);
+    border-left: 2px solid var(--red);
+    color: #dc2626;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: center;
+    animation: flicker 0.7s ease-in-out infinite;
+  }
 
   @media (max-width: 700px) {
-    .live-layout { grid-template-columns: 1fr; }
+    .live-layout { grid-template-columns: 1fr; height: auto; }
+    .live-feed-wrap { height: 56vw; min-height: 260px; }
   }
 </style>
 
-<h2>▶ Live Monitoring</h2>
-
 <div class="live-layout">
 
-  <div class="live-feed" id="feed-wrapper">
-    <!-- Filled by JS: either <video> for webcam or <img> for ESP32 stream -->
-    <div class="cam-error" id="cam-error">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-        <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-        <line x1="1" y1="1" x2="23" y2="23" stroke-width="1.5"/>
-      </svg>
-      NO SIGNAL
+  <!-- ── Feed ── -->
+  <div class="live-feed-wrap" id="feed-wrapper">
+    <div class="live-feed-inner">
+      <div class="feed-no-signal" id="cam-error">
+        <div class="no-signal-icon">⊘</div>
+        No Signal
+      </div>
     </div>
-    <div class="cam-label" id="cam-label">ESP32-CAM</div>
-    <div class="rec-dot" id="rec-dot" style="display:none"></div>
+
+    <!-- HUD decorations -->
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+    <div class="hud-cam-label" id="cam-label">ESP32-CAM</div>
+    <div class="hud-rec" id="rec-dot">REC</div>
   </div>
 
+  <!-- ── Panel ── -->
   <div class="live-panel">
-    <h3>AI Status</h3>
 
-    <div id="state-badge" class="status-badge status-normal">NORMAL</div>
+    <!-- AI Status -->
+    <div class="panel-card">
+      <div class="panel-label">AI Status</div>
+      <div id="state-badge" class="status-badge status-normal">Normal</div>
+    </div>
 
-    <div class="info-block">
+    <!-- Vitals -->
+    <div class="panel-card">
       <div class="info-row">
-        <span class="info-label">Risk</span>
+        <span class="info-key">Risk Score</span>
         <span class="info-val" id="risk">0%</span>
       </div>
       <div class="info-row">
-        <span class="info-label">Time</span>
+        <span class="info-key">Timestamp</span>
         <span class="info-val" id="time">--:--:--</span>
       </div>
     </div>
 
-    <div class="info-block">
-      <div class="level-row">
-        <div class="level-header">
-          <span class="info-label">L1 · Minor</span>
-          <span class="info-val" id="l1">0</span>
+    <!-- Sensors -->
+    <div class="panel-card" style="flex:1">
+      <div class="panel-label">Sensor Channels</div>
+
+      <div class="sensor-panel-row">
+        <div class="sensor-head">
+          <span class="sensor-key">L1 · Minor</span>
+          <span class="sensor-val" id="l1" style="color:var(--blue)">0</span>
         </div>
-        <div class="level-bar-bg"><div class="level-bar-fill" id="bar-l1"></div></div>
+        <div class="mini-track">
+          <div class="mini-fill" id="bar-l1" style="background:linear-gradient(90deg,rgba(59,130,246,0.5),var(--blue))"></div>
+        </div>
       </div>
-      <div class="level-row" style="margin-top:8px">
-        <div class="level-header">
-          <span class="info-label">L2 · Danger</span>
-          <span class="info-val" id="l2">0</span>
+
+      <div class="sensor-panel-row">
+        <div class="sensor-head">
+          <span class="sensor-key">L2 · Danger</span>
+          <span class="sensor-val" id="l2" style="color:var(--amber)">0</span>
         </div>
-        <div class="level-bar-bg"><div class="level-bar-fill" id="bar-l2"></div></div>
+        <div class="mini-track">
+          <div class="mini-fill" id="bar-l2" style="background:linear-gradient(90deg,rgba(245,158,11,0.5),var(--amber))"></div>
+        </div>
       </div>
-      <div class="level-row" style="margin-top:8px">
-        <div class="level-header">
-          <span class="info-label">L3 · Critical</span>
-          <span class="info-val" id="l3">0</span>
+
+      <div class="sensor-panel-row">
+        <div class="sensor-head">
+          <span class="sensor-key">L3 · Critical</span>
+          <span class="sensor-val" id="l3" style="color:var(--red)">0</span>
         </div>
-        <div class="level-bar-bg"><div class="level-bar-fill" id="bar-l3"></div></div>
+        <div class="mini-track">
+          <div class="mini-fill" id="bar-l3" style="background:linear-gradient(90deg,rgba(239,68,68,0.5),var(--red))"></div>
+        </div>
       </div>
     </div>
 
-    <button class="cam-btn" id="cam-toggle">⬤ Use Browser Camera</button>
+    <!-- Cam toggle -->
+    <button class="cam-toggle-btn" id="cam-toggle">◎ Use Browser Camera</button>
 
-    <div id="fall-alert" class="fall-alert">
-      ⚠ FALL DETECTED
-    </div>
+    <!-- Fall alert -->
+    <div id="fall-alert" class="fall-alert-panel">⚠ Fall Detected</div>
+
   </div>
-
 </div>
 
 <script>
-// ── State colours ───────────────────────────────────────────────
 const stateColors = {
   NORMAL:     "status-normal",
   UNBALANCED: "status-warning",
@@ -330,7 +382,6 @@ const stateColors = {
   CRITICAL:   "status-critical",
 };
 
-// ── Camera mode: "esp32" | "browser" ────────────────────────────
 let camMode = "esp32";
 let browserStream = null;
 
@@ -340,115 +391,83 @@ const camLabel     = document.getElementById("cam-label");
 const recDot       = document.getElementById("rec-dot");
 const camToggleBtn = document.getElementById("cam-toggle");
 
+function clearFeedElements() {
+  ["cam-img","cam-video"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { if (el.srcObject) el.srcObject = null; el.remove(); }
+  });
+  if (browserStream) { browserStream.getTracks().forEach(t => t.stop()); browserStream = null; }
+}
+
 function setESP32Mode() {
-  // Remove any existing video element
-  const oldVideo = document.getElementById("cam-video");
-  if (oldVideo) {
-    oldVideo.srcObject = null;
-    oldVideo.remove();
-  }
-  if (browserStream) {
-    browserStream.getTracks().forEach(t => t.stop());
-    browserStream = null;
-  }
-
-  // Add img tag for MJPEG stream
-  let img = document.getElementById("cam-img");
-  if (!img) {
-    img = document.createElement("img");
-    img.id  = "cam-feed";
-    img.alt = "Camera feed";
-    img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
-    feedWrapper.insertBefore(img, camError);
-  }
+  clearFeedElements();
+  const img = document.createElement("img");
+  img.id = "cam-img"; img.alt = "Camera feed";
+  img.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;";
+  img.onerror = () => { camError.style.display = "flex"; recDot.style.display = "none"; };
   img.src = "/video";
-
+  feedWrapper.querySelector('.live-feed-inner').insertBefore(img, camError);
   camError.style.display = "none";
-  camLabel.textContent   = "ESP32-CAM";
-  recDot.style.display   = "block";
-  camToggleBtn.textContent = "⬤ Use Browser Camera";
+  camLabel.textContent = "ESP32-CAM";
+  recDot.style.display = "flex";
+  camToggleBtn.textContent = "◎ Use Browser Camera";
   camToggleBtn.classList.remove("active");
   camMode = "esp32";
 }
 
 async function setBrowserMode() {
-  // Remove ESP32 img
-  const oldImg = document.getElementById("cam-feed");
-  if (oldImg) oldImg.remove();
-
+  clearFeedElements();
   try {
     browserStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false
     });
-
-    let video = document.getElementById("cam-video");
-    if (!video) {
-      video = document.createElement("video");
-      video.id = "cam-video";
-      video.autoplay = true;
-      video.playsInline = true;
-      video.muted = true;
-      video.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
-      feedWrapper.insertBefore(video, camError);
-    }
+    const video = document.createElement("video");
+    video.id = "cam-video"; video.autoplay = true; video.playsInline = true; video.muted = true;
+    video.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;";
     video.srcObject = browserStream;
-
+    feedWrapper.querySelector('.live-feed-inner').insertBefore(video, camError);
     camError.style.display = "none";
-    camLabel.textContent   = "BROWSER CAM";
-    recDot.style.display   = "block";
-    camToggleBtn.textContent = "⬤ Use ESP32 Stream";
+    camLabel.textContent = "BROWSER CAM";
+    recDot.style.display = "flex";
+    camToggleBtn.textContent = "◉ Use ESP32 Stream";
     camToggleBtn.classList.add("active");
     camMode = "browser";
-
-  } catch (err) {
+  } catch {
     camError.style.display = "flex";
-    camLabel.textContent   = "ACCESS DENIED";
-    recDot.style.display   = "none";
-    console.error("getUserMedia error:", err);
+    camLabel.textContent = "ACCESS DENIED";
+    recDot.style.display = "none";
   }
 }
 
 camToggleBtn.addEventListener("click", () => {
-  if (camMode === "esp32") {
-    setBrowserMode();
-  } else {
-    setESP32Mode();
-  }
+  camMode === "esp32" ? setBrowserMode() : setESP32Mode();
 });
 
-// Default: start with ESP32 stream
 setESP32Mode();
 
-
-// ── Socket.IO updates ────────────────────────────────────────────
 var socket = io();
+socket.on("connect_error", () => console.warn("Socket.IO failed"));
 
 socket.on("update", function(data) {
   const badge = document.getElementById("state-badge");
   const state = data.state || data.status || "NORMAL";
-
-  badge.innerText = state;
+  badge.textContent = state;
   badge.className = "status-badge " + (stateColors[state] || "status-normal");
 
-  document.getElementById("risk").innerText = (data.risk ?? 0) + "%";
-  document.getElementById("time").innerText = data.time ?? "--:--:--";
+  document.getElementById("risk").textContent = (data.risk ?? 0) + "%";
+  document.getElementById("time").textContent  = data.time ?? "--:--:--";
 
-  const l1 = data.l1 ?? 0;
-  const l2 = data.l2 ?? 0;
-  const l3 = data.l3 ?? 0;
-
-  document.getElementById("l1").innerText = l1;
-  document.getElementById("l2").innerText = l2;
-  document.getElementById("l3").innerText = l3;
-
-  // Animate level bars (cap at 100)
+  const l1 = data.l1 ?? 0, l2 = data.l2 ?? 0, l3 = data.l3 ?? 0;
+  document.getElementById("l1").textContent = l1;
+  document.getElementById("l2").textContent = l2;
+  document.getElementById("l3").textContent = l3;
   document.getElementById("bar-l1").style.width = Math.min(l1, 100) + "%";
   document.getElementById("bar-l2").style.width = Math.min(l2, 100) + "%";
   document.getElementById("bar-l3").style.width = Math.min(l3, 100) + "%";
 
-  const alertEl = document.getElementById("fall-alert");
-  alertEl.style.display = (state === "FALLING" || state === "CRITICAL") ? "block" : "none";
+  document.getElementById("fall-alert").style.display =
+    (state === "FALLING" || state === "CRITICAL") ? "block" : "none";
 });
 </script>
 

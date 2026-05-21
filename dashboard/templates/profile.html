@@ -1,36 +1,37 @@
 {% extends "layout.html" %}
 {% block title %}Profile — AIoT{% endblock %}
+{% block page_label %}<span>◎</span> User Profile{% endblock %}
 {% block content %}
 
-<h2>👤 Profile</h2>
+<div class="section-head">Account Information</div>
 
-<div class="card" style="max-width:480px">
-<table class="profile-table">
-    <thead>
-        <tr>
-            <th>Field</th>
-            <th>Value</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>Name</td>
-            <td>{{ user_name }}</td>
-        </tr>
-        <tr>
-            <td>Email</td>
-            <td>{{ user_email }}</td>
-        </tr>
-        <tr>
-            <td>Role</td>
-            <td>{{ user_role }}</td>
-        </tr>
-        <tr>
-            <td>System</td>
-            <td>AIoT Fall Detection</td>
-        </tr>
-    </tbody>
-</table>
+<div class="card" style="max-width:520px">
+    <table class="profile-table">
+        <thead>
+            <tr>
+                <th>Field</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Name</td>
+                <td>{{ user_name }}</td>
+            </tr>
+            <tr>
+                <td>Email</td>
+                <td>{{ user_email }}</td>
+            </tr>
+            <tr>
+                <td>Role</td>
+                <td>{{ user_role }}</td>
+            </tr>
+            <tr>
+                <td>System</td>
+                <td>AIoT Fall Detection</td>
+            </tr>
+        </tbody>
+    </table>
 </div>
 
 {% endblock %}

@@ -3,29 +3,498 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login — AIoT Fall Detection</title>
+    <title>Sign In — AIoT ICU</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@100;200;300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
+
+    <style>
+      :root {
+        --accent:      #3b82f6;
+        --accent-dark: #2563eb;
+        --accent-soft: rgba(59,130,246,0.10);
+        --red:         #ef4444;
+        --red-soft:    rgba(239,68,68,0.08);
+        --green:       #10b981;
+        --green-soft:  rgba(16,185,129,0.08);
+        --text:        #1e293b;
+        --text-sub:    #64748b;
+        --text-muted:  #94a3b8;
+        --line2:       rgba(148,163,184,0.22);
+        --font-display: 'Syne', sans-serif;
+        --font-body:   'DM Sans', sans-serif;
+        --font-mono:   'Sora', sans-serif;
+        --blur:        blur(24px) saturate(1.8);
+        --transition:  0.22s cubic-bezier(0.4,0,0.2,1);
+        --transition-spring: 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      }
+
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; -webkit-font-smoothing: antialiased; }
+
+      body {
+        font-family: 'Sora', sans-serif;
+        background: #f0f4ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Animated mesh background */
+      .bg-mesh {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+      }
+
+      .bg-orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        animation: orb-drift 12s ease-in-out infinite alternate;
+      }
+
+      .bg-orb-1 {
+        width: 600px; height: 600px;
+        background: radial-gradient(circle, rgba(59,130,246,0.14) 0%, transparent 70%);
+        top: -200px; left: -100px;
+        animation-delay: 0s;
+      }
+
+      .bg-orb-2 {
+        width: 500px; height: 500px;
+        background: radial-gradient(circle, rgba(16,185,129,0.10) 0%, transparent 70%);
+        bottom: -150px; right: -80px;
+        animation-delay: -4s;
+      }
+
+      .bg-orb-3 {
+        width: 400px; height: 400px;
+        background: radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%);
+        top: 50%; right: 20%;
+        animation-delay: -7s;
+      }
+
+      @keyframes orb-drift {
+        from { transform: translate(0, 0) scale(1); }
+        to   { transform: translate(30px, -30px) scale(1.06); }
+      }
+
+      /* Grid dots */
+      .bg-grid {
+        position: fixed;
+        inset: 0;
+        background-image: radial-gradient(circle at 1px 1px, rgba(148,163,184,0.18) 1px, transparent 0);
+        background-size: 36px 36px;
+        z-index: 0;
+        pointer-events: none;
+      }
+
+      /* ── Auth Container ── */
+      .auth-container {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 0;
+        animation: auth-enter 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      }
+
+      @keyframes auth-enter {
+        from { opacity: 0; transform: translateY(32px) scale(0.96); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      /* ── Left panel ── */
+      .auth-left {
+        display: none;
+        width: 320px;
+        background: linear-gradient(160deg, #1e3a8a 0%, #1e40af 60%, #1d4ed8 100%);
+        border-radius: 24px 0 0 24px;
+        padding: 44px 36px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+        align-self: stretch;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      @media (min-width: 900px) {
+        .auth-left { display: flex; }
+      }
+
+      .auth-left::before {
+        content: '';
+        position: absolute;
+        top: -80px; right: -80px;
+        width: 250px; height: 250px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.06);
+        pointer-events: none;
+      }
+
+      .auth-left::after {
+        content: '';
+        position: absolute;
+        bottom: -60px; left: -40px;
+        width: 200px; height: 200px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.04);
+        pointer-events: none;
+      }
+
+      .auth-left-brand {
+        font-family: 'Sora', sans-serif;
+        font-size: 0.58rem;
+        letter-spacing: 0.38em;
+        color: rgba(147,197,253,0.8);
+        text-transform: uppercase;
+        margin-bottom: 32px;
+      }
+
+      .auth-left-title {
+        font-family: 'Sora', sans-serif;
+        font-size: 2.2rem;
+        font-weight: 800;
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+        color: #ffffff;
+        margin-bottom: 14px;
+      }
+
+      .auth-left-title span { color: #93c5fd; }
+
+      .auth-left-desc {
+        font-size: 0.875rem;
+        color: rgba(186,230,253,0.75);
+        line-height: 1.65;
+      }
+
+      .auth-feature-list {
+        list-style: none;
+        margin-top: 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .auth-feature-list li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.83rem;
+        color: rgba(186,230,253,0.80);
+      }
+
+      .feat-check {
+        width: 20px; height: 20px;
+        border-radius: 50%;
+        background: rgba(16,185,129,0.20);
+        border: 1px solid rgba(16,185,129,0.35);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.65rem;
+        color: #6ee7b7;
+        flex-shrink: 0;
+      }
+
+      .auth-left-footer {
+        font-family: 'Sora', sans-serif;
+        font-size: 0.6rem;
+        color: rgba(147,197,253,0.40);
+        letter-spacing: 0.12em;
+      }
+
+      /* ── Right panel (form) ── */
+      .auth-right {
+        background: rgba(255,255,255,0.86);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+        border: 1px solid rgba(255,255,255,0.95);
+        border-radius: 24px;
+        padding: 48px 44px 44px;
+        width: 420px;
+        box-shadow: 0 24px 80px rgba(15,23,42,0.14), 0 4px 20px rgba(15,23,42,0.06);
+      }
+
+      @media (min-width: 900px) {
+        .auth-right {
+          border-radius: 0 24px 24px 0;
+          border-left: 1px solid rgba(255,255,255,0.5);
+        }
+      }
+
+      .auth-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 32px;
+      }
+
+      .auth-logo-icon {
+        width: 38px; height: 38px;
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1rem;
+        color: white;
+        box-shadow: 0 4px 14px rgba(59,130,246,0.35);
+      }
+
+      .auth-logo-text {
+        font-family: 'Sora', sans-serif;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.02em;
+      }
+
+      .auth-logo-text span { color: var(--accent); }
+
+      .auth-heading {
+        font-family: 'Sora', sans-serif;
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.03em;
+        margin-bottom: 6px;
+      }
+
+      .auth-subhead {
+        font-size: 0.875rem;
+        color: var(--text-sub);
+        margin-bottom: 30px;
+      }
+
+      /* Error / Success */
+      #error-msg {
+        background: rgba(239,68,68,0.07);
+        border: 1px solid rgba(239,68,68,0.18);
+        border-left: 3px solid var(--red);
+        color: #dc2626;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        margin-bottom: 18px;
+        display: none;
+      }
+
+      /* ── Input Group ── */
+      .field {
+        margin-bottom: 16px;
+      }
+
+      .field-label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        color: var(--text-sub);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+      }
+
+      .field-wrap {
+        position: relative;
+      }
+
+      .field-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        pointer-events: none;
+        transition: color var(--transition);
+      }
+
+      .field-wrap input:focus ~ .field-icon,
+      .field-wrap:focus-within .field-icon {
+        color: var(--accent);
+      }
+
+      .field-wrap input {
+        width: 100%;
+        padding: 13px 16px 13px 42px;
+        border: 1.5px solid rgba(148,163,184,0.30);
+        border-radius: 10px;
+        background: rgba(255,255,255,0.8);
+        font-family: 'Sora', sans-serif;
+        font-size: 0.9rem;
+        color: var(--text);
+        outline: none;
+        transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+      }
+
+      .field-wrap input:focus {
+        border-color: var(--accent);
+        background: #ffffff;
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+
+      .field-wrap input::placeholder { color: var(--text-muted); }
+
+      /* Show password toggle */
+      .show-pw-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 4px 0 22px;
+        font-size: 0.8rem;
+        color: var(--text-sub);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .show-pw-row input[type="checkbox"] {
+        width: 14px; height: 14px;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+
+      /* ── Submit button ── */
+      .btn-primary {
+        width: 100%;
+        padding: 14px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #4f8ff7 0%, var(--accent) 40%, var(--accent-dark) 100%);
+        color: #fff;
+        font-family: 'Sora', sans-serif;
+        font-size: 0.92rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        transition: transform var(--transition-spring), box-shadow var(--transition);
+        box-shadow: 0 6px 20px rgba(59,130,246,0.25);
+      }
+
+      .btn-primary::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 55%);
+        pointer-events: none;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 32px rgba(59,130,246,0.35);
+      }
+
+      .btn-primary:active { transform: translateY(0); }
+      .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+      /* ── Divider ── */
+      .auth-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 22px 0;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+      }
+
+      .auth-divider::before,
+      .auth-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: rgba(148,163,184,0.22);
+      }
+
+      /* Footer link */
+      .auth-footer-link {
+        margin-top: 22px;
+        text-align: center;
+        font-size: 0.83rem;
+        color: var(--text-sub);
+      }
+
+      .auth-footer-link a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .auth-footer-link a:hover { text-decoration: underline; }
+    </style>
 </head>
-<body class="auth-page">
+<body>
 
-<div class="auth-box">
-    <h2>🔐 AIoT Fall Detection</h2>
-    <p class="auth-sub">Sign in to your account</p>
+<!-- Background effects -->
+<div class="bg-grid"></div>
+<div class="bg-mesh">
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+</div>
 
-    <div id="error-msg" class="error-msg" style="display:none"></div>
+<div class="auth-container">
+    <!-- Left branding panel -->
+    <div class="auth-left">
+        <div>
+            <div class="auth-left-brand">AIoT Fall Detection</div>
+            <div class="auth-left-title">AI-Powered<br><span>Medical</span><br>Monitoring</div>
+            <div class="auth-left-desc">Real-time patient safety monitoring with advanced computer vision and sensor fusion.</div>
+            <ul class="auth-feature-list">
+                <li><div class="feat-check">✓</div> Real-time fall detection</li>
+                <li><div class="feat-check">✓</div> Multi-sensor data fusion</li>
+                <li><div class="feat-check">✓</div> Instant alert system</li>
+                <li><div class="feat-check">✓</div> Video replay & analysis</li>
+            </ul>
+        </div>
+        <div class="auth-left-footer">SYSTEM v3.0 · HIPAA COMPLIANT</div>
+    </div>
 
-    <input  id="email"    type="email"    placeholder="Email address" autocomplete="email">
-    <input  id="password" type="password" placeholder="Password"      autocomplete="current-password">
+    <!-- Right form panel -->
+    <div class="auth-right">
+        <div class="auth-logo">
+            <div class="auth-logo-icon">⬡</div>
+            <div class="auth-logo-text">AI<span>oT</span> ICU</div>
+        </div>
 
-    <label class="show-pw-label">
-        <input type="checkbox" onchange="togglePw()"> Show password
-    </label>
+        <div class="auth-heading">Welcome back</div>
+        <div class="auth-subhead">Sign in to access your monitoring dashboard</div>
 
-    <button onclick="doLogin()">Login</button>
+        <div id="error-msg"></div>
 
-    <p class="auth-footer">
-        Don't have an account? <a href="/register">Register</a>
-    </p>
+        <div class="field">
+            <label class="field-label" for="email">Email address</label>
+            <div class="field-wrap">
+                <input id="email" type="email" placeholder="you@hospital.com" autocomplete="email">
+                <span class="field-icon">✉</span>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="password">Password</label>
+            <div class="field-wrap">
+                <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+                <span class="field-icon">🔒</span>
+            </div>
+        </div>
+
+        <label class="show-pw-row">
+            <input type="checkbox" onchange="togglePw()"> Show password
+        </label>
+
+        <button class="btn-primary" id="login-btn" onclick="doLogin()">Sign In</button>
+
+        <div class="auth-divider">or</div>
+
+        <div class="auth-footer-link">
+            No account? <a href="/register">Create one →</a>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -37,24 +506,33 @@ function togglePw() {
 async function doLogin() {
     const email    = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value;
+    const btn      = document.getElementById("login-btn");
     const errEl    = document.getElementById("error-msg");
 
-    if (!email || !password) {
-        showError("Please enter your email and password.");
-        return;
-    }
+    errEl.style.display = "none";
 
-    const res  = await fetch("/login", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
+    if (!email || !password) { showError("Please enter your email and password."); return; }
 
-    if (data.ok) {
-        window.location.href = "/dashboard";
-    } else {
-        showError(data.msg || "Login failed.");
+    btn.disabled = true;
+    btn.textContent = "Signing in…";
+
+    try {
+        const res  = await fetch("/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            btn.textContent = "✓ Success";
+            window.location.href = "/dashboard";
+        } else {
+            showError(data.msg || "Login failed.");
+            btn.disabled = false; btn.textContent = "Sign In";
+        }
+    } catch {
+        showError("Network error. Please try again.");
+        btn.disabled = false; btn.textContent = "Sign In";
     }
 }
 
@@ -62,9 +540,11 @@ function showError(msg) {
     const el = document.getElementById("error-msg");
     el.textContent = msg;
     el.style.display = "block";
+    el.style.animation = "none";
+    el.offsetHeight;
+    el.style.animation = "auth-enter 0.3s ease both";
 }
 
-// Allow pressing Enter on email/password fields to submit
 document.getElementById("email").addEventListener("keydown",    e => { if (e.key === "Enter") doLogin(); });
 document.getElementById("password").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
 </script>

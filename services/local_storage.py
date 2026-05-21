@@ -2,6 +2,7 @@ import cv2
 import os
 import time
 import subprocess
+import numpy as np
 
 # =========================
 # BASE PATH
@@ -26,7 +27,11 @@ os.makedirs(
 # FFMPEG PATH
 # =========================
 
-FFMPEG_PATH = r"E:\ffmpeg-8.1.1-essentials_build\ffmpeg-8.1.1-essentials_build\bin\ffmpeg.exe"
+FFMPEG_PATH = (
+    r"E:\ffmpeg-8.1.1-essentials_build"
+    r"\ffmpeg-8.1.1-essentials_build"
+    r"\bin\ffmpeg.exe"
+)
 
 # =========================
 # GET SEVERITY FOLDER
@@ -94,11 +99,6 @@ def save_video(
             "%Y%m%d_%H%M%S"
         )
 
-        raw_path = os.path.join(
-            user_dir,
-            f"raw_{timestamp}.avi"
-        )
-
         final_path = os.path.join(
             user_dir,
             f"event_{timestamp}.mp4"
@@ -113,29 +113,6 @@ def save_video(
         fps = 30
 
         # =========================
-        # SAVE RAW VIDEO
-        # =========================
-
-        fourcc = cv2.VideoWriter_fourcc(
-            *"XVID"
-        )
-
-        writer = cv2.VideoWriter(
-            raw_path,
-            fourcc,
-            fps,
-            (width, height)
-        )
-
-        for frame in frames:
-
-            writer.write(frame)
-
-        writer.release()
-
-        print("[VIDEO] Raw AVI saved")
-
-        # =========================
         # CHECK FFMPEG
         # =========================
 
@@ -144,13 +121,13 @@ def save_video(
         ):
 
             print(
-                "[FFMPEG] ffmpeg.exe not found"
+                "[FFMPEG] Not found"
             )
 
-            return raw_path
+            return None
 
         # =========================
-        # CONVERT TO MP4
+        # FFMPEG COMMAND
         # =========================
 
         command = [
@@ -159,63 +136,79 @@ def save_video(
 
             "-y",
 
-            "-i", raw_path,
+            # input from pipe
+            "-f", "rawvideo",
 
-            # H264 codec
+            "-vcodec", "rawvideo",
+
+            "-pix_fmt", "bgr24",
+
+            "-s", f"{width}x{height}",
+
+            "-r", str(fps),
+
+            "-i", "-",
+
+            # encoder
+            "-an",
+
             "-c:v", "libx264",
 
-            # Fast encode
+            # ULTRA FAST
             "-preset", "ultrafast",
 
             # Telegram compatible
             "-pix_fmt", "yuv420p",
 
-            # Stream immediately
+            # stream immediately
             "-movflags", "+faststart",
 
-            # FPS
-            "-r", "30",
-
-            # Optimize size
+            # quality
             "-crf", "23",
-
-            # no audio
-            "-an",
 
             final_path
         ]
 
-        result = subprocess.run(
+        # =========================
+        # START FFMPEG
+        # =========================
+
+        process = subprocess.Popen(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
         )
 
         # =========================
-        # CHECK RESULT
+        # WRITE FRAMES
         # =========================
 
-        if result.returncode != 0:
+        for frame in frames:
 
-            print("[FFMPEG ERROR]")
-
-            print(
-                result.stderr.decode(
-                    errors="ignore"
-                )
+            process.stdin.write(
+                frame.tobytes()
             )
 
-            return raw_path
+        process.stdin.close()
+
+        process.wait()
 
         # =========================
-        # DELETE RAW AVI
+        # CHECK OUTPUT
         # =========================
 
-        if os.path.exists(raw_path):
+        if not os.path.exists(
+            final_path
+        ):
 
-            os.remove(raw_path)
+            print(
+                "[VIDEO ERROR] MP4 not created"
+            )
 
-        print("[VIDEO] MP4 optimized")
+            return None
+
+        print("[VIDEO] MP4 SAVED")
 
         print(
             f"[VIDEO PATH] {final_path}"
