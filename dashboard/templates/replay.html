@@ -283,6 +283,36 @@ function setFilter(filter, el) {
     renderVideos();
 }
 
+function buildCard(video, i, animate) {
+    const palette = LEVEL_COLORS[video.level] || { color: "#3b82f6", bg: "rgba(59,130,246,0.09)" };
+    const card = document.createElement("div");
+    card.className = "video-card";
+    card.dataset.file = video.file;
+    if (animate) {
+        card.style.animationDelay = (i * 0.05) + "s";
+        card.style.animation = "slide-in-up 0.35s ease both";
+    }
+    card.innerHTML = `
+        <div class="video-level" style="background:${palette.bg};color:${palette.color}">
+            <div class="video-level-indicator">
+                <div class="level-dot" style="background:${palette.color};box-shadow:0 0 6px ${palette.color}"></div>
+                ${video.level}
+            </div>
+            <div class="video-timestamp">${video.timestamp || "—"}</div>
+        </div>
+        <div class="video-wrap">
+            <video controls preload="metadata">
+                <source src="${video.url}" type="video/mp4">
+            </video>
+            <div class="ai-detection-badge">AI Detected</div>
+        </div>
+        <div class="video-footer">
+            <div class="video-name-text">${video.file}</div>
+        </div>
+    `;
+    return card;
+}
+
 function renderVideos() {
     const container = document.getElementById("video-container");
     const empty     = document.getElementById("empty-box");
@@ -293,41 +323,35 @@ function renderVideos() {
         : allVideos.filter(v => v.level === currentFilter);
 
     countEl.textContent = filtered.length + " recording" + (filtered.length !== 1 ? "s" : "");
-    container.innerHTML = "";
 
     if (filtered.length === 0) {
         empty.style.display = "block";
+        [...container.querySelectorAll('.video-card')].forEach(card => {
+            const vid = card.querySelector('video');
+            if (!vid || vid.paused) card.remove();
+        });
         return;
     }
 
     empty.style.display = "none";
 
-    filtered.forEach((video, i) => {
-        const palette = LEVEL_COLORS[video.level] || { color: "#3b82f6", bg: "rgba(59,130,246,0.09)" };
-        const card = document.createElement("div");
-        card.className = "video-card";
-        card.style.animationDelay = (i * 0.05) + "s";
-        card.style.animation = "slide-in-up 0.35s ease both";
+    // Remove cards no longer in the list — but never interrupt a playing video
+    const incomingKeys = new Set(filtered.map(v => v.file));
+    [...container.querySelectorAll('.video-card')].forEach(card => {
+        if (!incomingKeys.has(card.dataset.file)) {
+            const vid = card.querySelector('video');
+            if (!vid || vid.paused) card.remove();
+        }
+    });
 
-        card.innerHTML = `
-            <div class="video-level" style="background:${palette.bg};color:${palette.color}">
-                <div class="video-level-indicator">
-                    <div class="level-dot" style="background:${palette.color};box-shadow:0 0 6px ${palette.color}"></div>
-                    ${video.level}
-                </div>
-                <div class="video-timestamp">${video.timestamp || "—"}</div>
-            </div>
-            <div class="video-wrap">
-                <video controls preload="metadata">
-                    <source src="${video.url}" type="video/mp4">
-                </video>
-                <div class="ai-detection-badge">AI Detected</div>
-            </div>
-            <div class="video-footer">
-                <div class="video-name-text">${video.file}</div>
-            </div>
-        `;
-        container.appendChild(card);
+    // Add only cards not already rendered — never touch existing ones
+    const existingKeys = new Set(
+        [...container.querySelectorAll('.video-card')].map(c => c.dataset.file)
+    );
+    filtered.forEach((video, i) => {
+        if (!existingKeys.has(video.file)) {
+            container.appendChild(buildCard(video, i, true));
+        }
     });
 }
 

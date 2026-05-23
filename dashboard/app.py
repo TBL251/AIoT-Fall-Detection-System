@@ -536,72 +536,57 @@ def profile():
 # VIDEO STREAM
 # =============================================================================
 
-ESP32_STREAM_URL = "http://192.168.1.100/stream"
 
 def gen_frames():
 
-    cap = cv2.VideoCapture(
-        ESP32_STREAM_URL
-    )
-
-    use_cap = cap.isOpened()
+    import shared_camera
+    import numpy as np
+    import time
 
     while True:
 
-        if use_cap:
+        frame = shared_camera.latest_frame
 
-            success, frame = cap.read()
-
-            if not success:
-
-                use_cap = False
-
-                cap.release()
-
-        else:
-
-            import numpy as np
+        if frame is None:
 
             frame = np.ones(
-                (360, 640, 3),
-                dtype="uint8"
-            ) * 120
+                (480, 640, 3),
+                dtype=np.uint8
+            ) * 30
 
             cv2.putText(
                 frame,
-                "ESP32-CAM OFFLINE",
-                (140, 180),
+                "WAITING FOR AI CAMERA...",
+                (100, 240),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 1,
                 (255, 255, 255),
                 2
             )
 
-        _, buffer = cv2.imencode(
+        success, buffer = cv2.imencode(
             ".jpg",
             frame
         )
 
+        if not success:
+            continue
+
         frame_bytes = buffer.tobytes()
 
         yield (
-
             b"--frame\r\n"
-
             b"Content-Type: image/jpeg\r\n\r\n"
-
             + frame_bytes +
-
             b"\r\n"
         )
 
-        time.sleep(0.05)
+        time.sleep(0.03)
 
 @app.route("/video")
 def video():
 
-    if not is_login():
-        return "", 403
+    print("SESSION:", session)
 
     return Response(
         gen_frames(),

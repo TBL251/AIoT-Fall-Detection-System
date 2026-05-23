@@ -394,16 +394,46 @@ const camToggleBtn = document.getElementById("cam-toggle");
 function clearFeedElements() {
   ["cam-img","cam-video"].forEach(id => {
     const el = document.getElementById(id);
-    if (el) { if (el.srcObject) el.srcObject = null; el.remove(); }
+    if (el) {
+      // Blank src first — this closes the HTTP connection for MJPEG streams
+      // before the element is removed, preventing the browser from keeping
+      // the /video request alive until GC collects the element.
+      if (el.tagName === "IMG")   { el.src = ""; }
+      if (el.tagName === "VIDEO") { el.pause(); el.srcObject = null; }
+      el.remove();
+    }
   });
+  // Stop all browser camera tracks (releases the camera indicator light)
   if (browserStream) { browserStream.getTracks().forEach(t => t.stop()); browserStream = null; }
 }
+
+// Stop all streams when the user navigates away (clicks a sidebar/topbar link,
+// closes the tab, refreshes, etc.)
+window.addEventListener("beforeunload", clearFeedElements);
+
+// Also pause when the tab is hidden (e.g. user switches browser tabs),
+// and resume when they come back — avoids wasting bandwidth in background.
+document.addEventListener("visibilitychange", function () {
+  if (document.hidden) {
+    clearFeedElements();
+    camMode = "esp32"; // reset so returning to the page starts fresh
+  }
+});
 
 function setESP32Mode() {
   clearFeedElements();
   const img = document.createElement("img");
   img.id = "cam-img"; img.alt = "Camera feed";
-  img.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;";
+  img.style.cssText = `
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  z-index:1;
+  pointer-events:none;
+  `;
   img.onerror = () => { camError.style.display = "flex"; recDot.style.display = "none"; };
   img.src = "/video";
   feedWrapper.querySelector('.live-feed-inner').insertBefore(img, camError);
@@ -424,7 +454,16 @@ async function setBrowserMode() {
     });
     const video = document.createElement("video");
     video.id = "cam-video"; video.autoplay = true; video.playsInline = true; video.muted = true;
-    video.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;";
+    video.style.cssText = `
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+    z-index:1;
+    pointer-events:none;
+    `;
     video.srcObject = browserStream;
     feedWrapper.querySelector('.live-feed-inner').insertBefore(video, camError);
     camError.style.display = "none";

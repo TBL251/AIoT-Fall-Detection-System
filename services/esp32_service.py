@@ -6,7 +6,7 @@ class ESP32Controller:
 
     def __init__(
         self,
-        port="COM3",
+        port="COM5",
         baudrate=115200
     ):
 

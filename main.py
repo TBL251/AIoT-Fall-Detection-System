@@ -2,6 +2,7 @@ import cv2
 import time
 import json
 import os
+import shared_camera
 
 from ai_detection.pipeline import AIPipeline
 
@@ -95,7 +96,7 @@ event_manager = EventManager()
 
 try:
 
-    camera = CameraStream(0)
+    camera = CameraStream(1)
 
 except Exception as e:
 
@@ -176,6 +177,7 @@ try:
             ) = pipeline.process(
                 frame
             )
+            shared_camera.latest_frame = frame.copy()
 
         except Exception as e:
 
@@ -332,28 +334,6 @@ try:
             2
         )
 
-        # =========================
-        # SHOW WINDOW
-        # =========================
-
-        cv2.imshow(
-            "🏥 ICU MONITORING SYSTEM",
-            frame
-        )
-
-        # =========================
-        # ESC TO EXIT
-        # =========================
-
-        key = cv2.waitKey(1)
-
-        if key & 0xFF == 27:
-
-            print(
-                "[SYSTEM] Exit requested"
-            )
-
-            break
 
 finally:
 

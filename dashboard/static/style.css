@@ -594,4 +594,5 @@ body.auth-page::after {
 @media (max-width: 640px) {
   :root { --sidebar-w: 0px; }
   .auth-box { padding: 32px 24px; margin: 16px; }
+
 }
