@@ -1,0 +1,25 @@
+# Dataset (KHÔNG push)
+dataset/
+AI_Training/dataset/
+
+# dữ liệu đã xử lý
+*.npy
+*.npz
+*.pkl
+*.json
+
+# video raw
+*.mp4
+*.avi
+*.mov
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+
+# env
+venv/

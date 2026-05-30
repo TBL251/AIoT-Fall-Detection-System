@@ -83,6 +83,10 @@ class EventManager:
         severity,
         email=None
     ):
+        try:
+            severity = int(severity)
+        except:
+            severity = 0
 
         current_time = time.time()
 
