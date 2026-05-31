@@ -1,70 +1,78 @@
 # AIoT Fall Detection System
 
-AI-powered IoT Fall Detection & Emergency Monitoring System using:
+An AI-powered IoT Fall Detection and Emergency Monitoring System for elderly care, patient monitoring, and smart healthcare environments.
 
-* Python
-* OpenCV
-* MediaPipe
-* Flask Dashboard
-* Telegram Bot
-* Firebase
-* ESP32 Alarm Controller
-
-The system detects human falls in realtime, records emergency videos, stores them automatically, and sends alerts through Telegram and ESP32 devices.
+The system combines Computer Vision, Deep Learning, IoT devices, Cloud Services, and Real-Time Notifications to detect falls, classify emergency severity, record incidents, and notify caregivers instantly.
 
 ---
 
 # Features
 
-## AI Fall Detection
+## Real-Time Fall Detection
 
-* Realtime pose estimation using MediaPipe
-* Fall state analysis
-* Risk score calculation
-* Severity classification:
+The system uses:
 
-  * Minor
-  * Dangerous
-  * Critical Emergency
+* YOLO Pose for human pose estimation
+* Temporal Convolutional Network (TCN) for action classification
+* Real-time video processing
+* Automatic fall confidence scoring
+* Emergency severity assessment
+
+Severity Levels:
+
+* Minor
+* Dangerous
+* Critical Emergency
 
 ---
 
 ## Smart Emergency Recording
 
-The system records automatically when a fall is detected.
+The system automatically records video when a fall is detected.
 
-Recording logic:
+Workflow:
 
 ```text
-FALL DETECTED
-    ↓
+Fall Detected
+      ↓
 Start Recording
-    ↓
-Danger ?
- ├── YES → Continue Recording
- └── NO
-        ↓
-   Wait Recovery Time
-        ↓
-Normal stable ?
- ├── YES → Stop Recording
- └── NO → Continue Recording
+      ↓
+Evaluate Severity
+      ↓
+Monitor Recovery
+      ↓
+Recovery Stable?
+      ↓
+Save Video
 ```
 
+Features:
+
+* Pre-event frame buffering
+* Post-event recording
+* MP4 video generation
+* FFmpeg H264 encoding
+* Automatic storage organization
+
 ---
 
-## Telegram Integration
+## Telegram Emergency Alert
 
-* Instant emergency alerts
-* Inline video playback in Telegram
-* Recovery video delivery
-* Emergency notifications
+When a fall occurs:
+
+* Telegram notification is sent instantly
+* Emergency severity is included
+* Event video is uploaded automatically
+* Recovery notification can be sent
 
 ---
 
-## ESP32 Integration
+## ESP32 Emergency Alarm
 
-* LED / buzzer emergency alarm
+ESP32 integration supports:
+
+* Buzzer alarm
+* LED warning system
 * Serial communication
 * Emergency level synchronization
 
@@ -72,22 +80,148 @@ Normal stable ?
 
 ## Flask Dashboard
 
-Web dashboard with:
+Web-based monitoring dashboard:
 
-* Login/Register
-* Live camera monitoring
-* Realtime AI status
-* Replay recorded videos
-* Charts & statistics
-* User profile system
+* User Login / Registration
+* OTP Verification
+* Live Camera Monitoring
+* Real-Time AI Status
+* Replay Recorded Videos
+* Statistics Dashboard
+* User Profile Management
 
 ---
 
-## Firebase Support
+## Firebase Integration
 
-* Event storage
-* Cloud synchronization
-* Emergency history logging
+Firebase is used for:
+
+* Event Logging
+* Cloud Synchronization
+* Historical Data Storage
+* Monitoring Analytics
+
+---
+
+# System Architecture
+
+```text
+USB Camera
+     │
+     ▼
+YOLO Pose
+     │
+     ▼
+Feature Extraction
+     │
+     ▼
+TCN Model
+     │
+     ▼
+Fall Classification
+     │
+ ┌───┼─────────────┐
+ │   │             │
+ ▼   ▼             ▼
+ESP32 Telegram   Dashboard
+Alarm Alert      Stream
+ │
+ ▼
+Video Recording
+```
+
+---
+
+# Dataset
+
+The model is trained using two public fall detection datasets.
+
+## UR Fall Detection Dataset
+
+Contains:
+
+* RGB videos
+* Fall activities
+* Activities of Daily Living (ADL)
+* Multiple subjects
+* Multiple viewpoints
+
+Official Website:
+
+https://fenix.ur.edu.pl/~mkepski/ds/uf.html
+
+---
+
+## Le2i Fall Detection Dataset
+
+Contains:
+
+* Indoor fall scenarios
+* Daily activities
+* Multiple fall types
+* Various camera placements
+
+Official Website:
+
+https://le2i.cnrs.fr/Fall-detection-Dataset
+
+---
+
+# Dataset Pipeline
+
+```text
+UR Dataset
+      │
+      ▼
+Frame Extraction
+
+Le2i Dataset
+      │
+      ▼
+Frame Extraction
+
+      ▼
+YOLO Pose Extraction
+
+      ▼
+Feature Engineering
+
+      ▼
+Merged Dataset
+
+      ▼
+TCN Training
+```
+
+---
+
+# AI Model
+
+## Pose Estimation
+
+```text
+YOLO Pose
+```
+
+## Temporal Classification
+
+```text
+Temporal Convolutional Network (TCN)
+```
+
+Input:
+
+```text
+Human Pose Keypoint Sequences
+```
+
+Output:
+
+```text
+Normal Activity
+or
+Fall Event
+```
 
 ---
 
@@ -96,31 +230,36 @@ Web dashboard with:
 ```text
 AIoT-Fall-Detection-System/
 │
-├── ai_detection/
-│   ├── pipeline.py
-│   ├── pose_detector.py
-│   ├── fall_detector.py
-│   └── utils.py
+├── AI_Training/
+│   ├── configs/
+│   ├── datasets/
+│   ├── features/
+│   ├── lstm/
+│   ├── realtime/
+│   ├── scripts/
+│   └── yolo/
 │
 ├── dashboard/
-│   ├── templates/
 │   ├── static/
+│   ├── templates/
 │   ├── app.py
 │   ├── auth.py
 │   ├── mail.py
 │   └── security.py
 │
 ├── services/
+│   ├── camera_thread.py
 │   ├── event_manager.py
 │   ├── local_storage.py
 │   ├── telegram_service.py
 │   ├── firebase_service.py
-│   ├── esp32_service.py
-│   └── shared_state.py
+│   └── esp32_service.py
 │
 ├── recorded_videos/
 │
+├── shared_camera.py
 ├── main.py
+├── mainAI.py
 ├── requirements.txt
 └── README.md
 ```
@@ -129,34 +268,37 @@ AIoT-Fall-Detection-System/
 
 # Installation
 
-## 1. Clone Project
+## Clone Repository
 
 ```bash
 git clone https://github.com/TBL251/AIoT-Fall-Detection-System.git
+
 cd AIoT-Fall-Detection-System
 ```
 
 ---
 
-## 2. Create Virtual Environment
+## Create Virtual Environment
 
 ### Windows
 
 ```bash
 python -m venv venv
+
 venv\Scripts\activate
 ```
 
-### Linux / Mac
+### Linux / macOS
 
 ```bash
 python3 -m venv venv
+
 source venv/bin/activate
 ```
 
 ---
 
-## 3. Install Requirements
+## Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -168,21 +310,15 @@ pip install -r requirements.txt
 
 FFmpeg is required for:
 
+* MP4 generation
 * H264 encoding
-* Telegram inline playback
-* Fast MP4 optimization
+* Telegram-compatible playback
 
-## Download
+Download:
 
-Official site:
 https://ffmpeg.org/download.html
 
-Windows build:
-https://www.gyan.dev/ffmpeg/builds/
-
----
-
-## Verify Installation
+Verify installation:
 
 ```bash
 ffmpeg -version
@@ -192,16 +328,60 @@ ffmpeg -version
 
 # Environment Variables
 
-Create `.env` file:
+Create a `.env` file:
 
 ```env
 BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
 CHAT_ID=YOUR_CHAT_ID
 
 MAIL_USERNAME=YOUR_EMAIL
-MAIL_PASSWORD=YOUR_PASSWORD
+MAIL_PASSWORD=YOUR_EMAIL_PASSWORD
 
 FIREBASE_CREDENTIALS=YOUR_FIREBASE_JSON
+```
+
+---
+
+# Dataset Preparation
+
+Run:
+
+```bash
+python mainAI.py
+```
+
+Choose:
+
+```text
+1. Extract & Build Dataset
+```
+
+Pipeline:
+
+```text
+Extract UR Dataset
+        ↓
+Extract Le2i Dataset
+        ↓
+Build Dataset
+        ↓
+Merge Dataset
+```
+
+---
+
+# Model Training
+
+Run:
+
+```bash
+python mainAI.py
+```
+
+Choose:
+
+```text
+2. Train Model
 ```
 
 ---
@@ -228,29 +408,13 @@ http://127.0.0.1:5000
 python main.py
 ```
 
----
+Example camera configuration:
 
-# Telegram Bot Setup
-
-## Create Bot
-
-Open:
-https://t.me/BotFather
-
-Command:
-
-```text
-/newbot
+```python
+CAMERA_INDEX = 0
 ```
 
-Copy the bot token.
-
----
-
-## Get Chat ID
-
-Open:
-https://t.me/getmyid_bot
+Use the index corresponding to your USB camera.
 
 ---
 
@@ -258,7 +422,7 @@ https://t.me/getmyid_bot
 
 ```text
 recorded_videos/
-│
+
 └── user_email/
     ├── Minor/
     ├── Dangerous/
@@ -268,66 +432,12 @@ recorded_videos/
 Example:
 
 ```text
-recorded_videos/tbl1240_gmail_com/Critical Emergency/event_20260519_120000.mp4
+recorded_videos/
+
+└── tbl251_gmail_com/
+    └── Dangerous/
+        └── event_20260531_200412.mp4
 ```
-
----
-
-# AI Pipeline
-
-Current version uses:
-
-* MediaPipe pose estimation
-* Angle calculation
-* State machine logic
-
-Future upgrade:
-
-* Deep Learning model
-* YOLO / LSTM / CNN
-* Custom AI training dataset
-
----
-
-# Current Detection Logic
-
-The system currently detects:
-
-* Body angle
-* Sudden vertical collapse
-* Long lying duration
-* Movement recovery
-
----
-
-# Future AI Training Plan
-
-Planned upgrade:
-
-* Collect dataset
-* Train custom fall detection model
-* Replace mathematical heuristics
-* Deploy optimized AI inference
-
-Suggested models:
-
-* YOLOv8 Pose
-* LSTM Action Recognition
-* MoveNet
-* TensorFlow Lite
-
----
-
-# Performance Optimization
-
-Optimizations included:
-
-* FPS limiter
-* Realtime frame buffering
-* FFmpeg pipe encoding
-* Telegram streaming support
-* Async recording
-* Reduced camera lag
 
 ---
 
@@ -335,24 +445,36 @@ Optimizations included:
 
 * Python
 * OpenCV
-* MediaPipe
+* YOLO Pose
+* TensorFlow
+* TCN
 * Flask
-* SocketIO
+* Flask-SocketIO
 * Firebase
 * Telegram Bot API
 * FFmpeg
 * ESP32
-* TensorFlow Lite
 
 ---
 
 # Security Features
 
-* Password hashing
-* Encrypted emails
-* Session management
-* OTP verification
-* Secure Telegram token storage
+* Password Hashing
+* Email Encryption
+* OTP Verification
+* Session Management
+* Protected Dashboard Access
+
+---
+
+# Future Improvements
+
+* Multi-person fall detection
+* TensorRT optimization
+* Edge AI deployment
+* Mobile application
+* Healthcare analytics dashboard
+* Cloud AI inference
 
 ---
 
@@ -364,8 +486,8 @@ MIT License
 
 # Author
 
-Developed by:
 TBL251
 
 GitHub:
+
 https://github.com/TBL251/AIoT-Fall-Detection-System
