@@ -73,7 +73,7 @@ USERS_FILE = os.path.join(BASE_DIR, "dashboard", "users.json")
 # ► Single source of truth for the camera index used by the whole system.
 #   Change this one constant and both the live stream AND recordings will
 #   use the new camera.
-CAMERA_INDEX = 1
+CAMERA_INDEX = 0
 
 RECOVERY_SECONDS = 5
 RISK_INCREMENT   = 5
