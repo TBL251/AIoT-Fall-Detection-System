@@ -57,7 +57,7 @@ from security import (
 
 app = Flask(__name__)
 
-app.secret_key = "aiot_fall_detection_2024"
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "aiot_fall_detection_2024")
 
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -586,6 +586,9 @@ def gen_frames():
 @app.route("/video")
 def video():
 
+    if not is_login():
+        return Response("Unauthorized", status=401)
+
     print("SESSION:", session)
 
     return Response(
@@ -706,13 +709,13 @@ def api_replays():
     if not os.path.exists(user_folder):
         return jsonify(result)
 
-    levels = [
-        "Minor",
-        "Dangerous",
-        "Critical Emergency"
-    ]
+    level_labels = {
+        "Minor":              "Minor",
+        "Dangerous":          "Dangerous",
+        "Critical_Emergency": "Critical Emergency",
+    }
 
-    for level in levels:
+    for level, label in level_labels.items():
 
         level_path = os.path.join(
             user_folder,
@@ -730,13 +733,15 @@ def api_replays():
 
                     "level": level,
 
+                    "label": label,
+
                     "file": file,
 
                     "url": f"/recorded/{safe_email}/{level}/{file}"
                 })
 
-    # newest first
-    result.reverse()
+    # newest first — filenames are timestamped (event_YYYYMMDD_HHMMSS.mp4)
+    result.sort(key=lambda x: x["file"], reverse=True)
 
     return jsonify(result)
 
@@ -746,13 +751,26 @@ def api_replays():
 # =============================================================================
 
 @app.route(
-    "/recorded/<user>/<level>/<filename>"
+    "/recorded/<user>/<path:level>/<filename>"
 )
 def recorded_video(
     user,
     level,
     filename
 ):
+
+    if not is_login():
+        return Response("Unauthorized", status=401)
+
+    # Prevent accessing another user's videos
+    current_email = session.get("user", "")
+    safe_email = (
+        current_email
+        .replace("@", "_")
+        .replace(".", "_")
+    )
+    if user != safe_email:
+        return Response("Forbidden", status=403)
 
     folder = os.path.join(
         BASE_RECORDED_FOLDER,

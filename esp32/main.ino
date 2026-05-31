@@ -1,63 +1,48 @@
-// =============================================================================
-//  fall_detection_buzzer.ino
-//  AIoT Fall Detection — ESP32 Buzzer Alarm System
-//
-//  Serial Protocol (Python → ESP32):
-//    '0'  Normal          — stop alarm
-//    '1'  Minor Fall      — 2 slow beeps  (400 ms on / 400 ms off)
-//    '2'  Dangerous Fall  — 5 fast beeps  (150 ms on / 150 ms off)
-//    '3'  Critical        — infinite rapid beeps (100 ms on / 100 ms off)
-//                           stops ONLY on command '0' or safety timeout
-//
-//  Buzzer support:
-//    ACTIVE_BUZZER  1  → uses digitalWrite()   (active buzzer)
-//    ACTIVE_BUZZER  0  → uses tone()/noTone()  (passive buzzer)
-//
-//  Architecture: fully non-blocking FSM, no delay() anywhere.
-//  Tested on: ESP32 Dev Module, Arduino IDE 2.x, ESP32 core ≥ 2.0
-//
-//  NOTE: The variable holding FSM state is named 'buz' (not 'alarm') to
-//  avoid a collision with the POSIX alarm() function declared in
-//  <sys/unistd.h>, which is pulled in transitively by ESP32's newlib headers.
-// =============================================================================
+// =====================================================
+// ESP32 Fall Detection Buzzer — FINAL STABLE VERSION
+// =====================================================
 
-// ── Configuration ─────────────────────────────────────────────────────────────
+#define BUZZER_PIN 25
 
-#define BUZZER_PIN        25        // GPIO connected to buzzer
-#define ACTIVE_BUZZER     1         // 1 = active (digitalWrite), 0 = passive (tone)
-#define PASSIVE_FREQ      2000      // Hz — used only when ACTIVE_BUZZER == 0
+// 🔥 CHANGE THIS BASED ON YOUR BUZZER TYPE
+// 1 = active buzzer (HIGH = ON)
+// 0 = passive buzzer (tone)
+#define ACTIVE_BUZZER 1
 
-#define SAFETY_TIMEOUT_MS 10000UL  // Auto-stop if no command received (ms)
-#define DEBOUNCE_MS       80UL     // Ignore repeated commands within this window
+#define PASSIVE_FREQ 2000
+#define SAFETY_TIMEOUT_MS 10000
+#define DEBOUNCE_MS 80
 
-// ── Alarm FSM states ──────────────────────────────────────────────────────────
+// ---------------- FSM ----------------
 
-typedef enum : uint8_t {
-  ALARM_IDLE = 0,   // buzzer off, nothing running
-  ALARM_BEEP_ON,    // buzzer currently sounding
-  ALARM_BEEP_OFF,   // buzzer in inter-beep silence
-  ALARM_INFINITE    // critical: beep loop, never stops until '0'
-} AlarmState;
+enum State : uint8_t {
+  IDLE,
+  BEEP_ON,
+  BEEP_OFF,
+  INFINITE
+};
 
-// ── Runtime state ─────────────────────────────────────────────────────────────
-// Named 'buz' to avoid collision with POSIX alarm() in ESP32 newlib headers.
+struct Buzzer {
+  State state = IDLE;
+  unsigned long nextTime = 0;
 
-static struct {
-  AlarmState    state;
-  unsigned long phaseUntil;     // millis() when current ON/OFF phase ends
-  int           beepCount;      // beeps completed so far
-  int           beepTarget;     // total beeps to play  (0 = infinite)
-  unsigned int  onMs;           // buzzer-on duration (ms)
-  unsigned int  offMs;          // buzzer-off duration (ms)
-  bool          infOn;          // ALARM_INFINITE: tracks current ON/OFF phase
+  int target = 0;
+  int count = 0;
+
+  unsigned int onMs = 0;
+  unsigned int offMs = 0;
+
+  bool toggle = false;
 } buz;
 
-static unsigned long lastCommandTime = 0;  // millis() of last valid command
-static unsigned long lastCmdReceived = 0;  // millis() for debounce window
+// ---------------- TIME ----------------
 
-// ── Low-level buzzer helpers ──────────────────────────────────────────────────
+unsigned long lastCmdTime = 0;
+unsigned long lastRxTime = 0;
 
-static inline void buzzerOn() {
+// ---------------- BUZZER LOW LEVEL ----------------
+
+void buzzerOn() {
 #if ACTIVE_BUZZER
   digitalWrite(BUZZER_PIN, HIGH);
 #else
@@ -65,7 +50,7 @@ static inline void buzzerOn() {
 #endif
 }
 
-static inline void buzzerOff() {
+void buzzerOff() {
 #if ACTIVE_BUZZER
   digitalWrite(BUZZER_PIN, LOW);
 #else
@@ -73,201 +58,155 @@ static inline void buzzerOff() {
 #endif
 }
 
-// =============================================================================
-//  stopAlarm()  — hard-stop: silence buzzer and reset ALL state
-// =============================================================================
+// ---------------- STOP ----------------
 
-void stopAlarm() {
+void stopBuzzer() {
   buzzerOff();
-  buz.state      = ALARM_IDLE;
-  buz.phaseUntil = 0;
-  buz.beepCount  = 0;
-  buz.beepTarget = 0;
-  buz.onMs       = 0;
-  buz.offMs      = 0;
-  buz.infOn      = false;
-  Serial.println(F("[ESP32] STOP ALARM"));
+  buz.state = IDLE;
+  buz.count = 0;
+  buz.target = 0;
+  Serial.println("[ESP32] STOP");
 }
 
-// =============================================================================
-//  startBeep()  — initialise and kick off a beep pattern
-//    count == 0  → infinite (Critical Emergency mode)
-// =============================================================================
+// ---------------- START PATTERN ----------------
 
-void startBeep(int count, unsigned int onMs, unsigned int offMs) {
-  // Hard-stop any currently running pattern so no stale phase leaks through
-  if (buz.state != ALARM_IDLE) {
-    buzzerOff();
-  }
+void startPattern(int count, int onMs, int offMs) {
 
-  buz.beepTarget = count;
-  buz.beepCount  = 0;
-  buz.onMs       = onMs;
-  buz.offMs      = offMs;
-  buz.infOn      = true;   // always start with buzzer ON
-  buz.state      = (count == 0) ? ALARM_INFINITE : ALARM_BEEP_ON;
-  buz.phaseUntil = millis() + onMs;
+  buz.state = (count == 0) ? INFINITE : BEEP_ON;
+  buz.target = count;
+  buz.count = 0;
+
+  buz.onMs = onMs;
+  buz.offMs = offMs;
+
+  buz.toggle = true;
+  buz.nextTime = millis() + onMs;
 
   buzzerOn();
 
-  Serial.print(F("[ESP32] START ALARM — count="));
-  Serial.print(count == 0 ? -1 : count);
-  Serial.print(F(" on="));
-  Serial.print(onMs);
-  Serial.print(F("ms off="));
-  Serial.print(offMs);
-  Serial.println(F("ms"));
+  Serial.print("[ESP32] START count=");
+  Serial.println(count == 0 ? -1 : count);
 }
 
-// =============================================================================
-//  tickBeep()  — FSM tick; call every loop(), costs < 1 µs when idle
-// =============================================================================
+// ---------------- FSM TICK ----------------
 
-void tickBeep() {
-  if (buz.state == ALARM_IDLE) return;
+void tick() {
 
-  const unsigned long now = millis();
-  if (now < buz.phaseUntil) return;   // still inside current phase
+  if (buz.state == IDLE) return;
+
+  unsigned long now = millis();
+  if (now < buz.nextTime) return;
 
   switch (buz.state) {
 
-    // ── ON phase complete → go OFF ─────────────────────────────────────────
-    case ALARM_BEEP_ON:
+    case BEEP_ON:
       buzzerOff();
-      buz.state      = ALARM_BEEP_OFF;
-      buz.phaseUntil = now + buz.offMs;
+      buz.state = BEEP_OFF;
+      buz.nextTime = now + buz.offMs;
       break;
 
-    // ── OFF phase complete → next beep or finish ───────────────────────────
-    case ALARM_BEEP_OFF:
-      buz.beepCount++;
-      if (buz.beepCount >= buz.beepTarget) {
-        // Pattern finished naturally — go idle
-        buzzerOff();
-        buz.state = ALARM_IDLE;
+    case BEEP_OFF:
+      buz.count++;
+
+      if (buz.count >= buz.target) {
+        stopBuzzer();
       } else {
         buzzerOn();
-        buz.state      = ALARM_BEEP_ON;
-        buz.phaseUntil = now + buz.onMs;
+        buz.state = BEEP_ON;
+        buz.nextTime = now + buz.onMs;
       }
       break;
 
-    // ── INFINITE: toggle ON/OFF forever until command '0' ─────────────────
-    case ALARM_INFINITE:
-      buz.infOn = !buz.infOn;
-      if (buz.infOn) {
+    case INFINITE:
+      buz.toggle = !buz.toggle;
+
+      if (buz.toggle) {
         buzzerOn();
-        buz.phaseUntil = now + buz.onMs;
+        buz.nextTime = now + buz.onMs;
       } else {
         buzzerOff();
-        buz.phaseUntil = now + buz.offMs;
+        buz.nextTime = now + buz.offMs;
       }
       break;
 
     default:
-      stopAlarm();   // unexpected state — safe fallback
+      stopBuzzer();
       break;
   }
 }
 
-// =============================================================================
-//  handleCommand()  — process a validated single-char command
-// =============================================================================
+// ---------------- HANDLE COMMAND ----------------
 
-void handleCommand(const char cmd) {
-  Serial.print(F("[ESP32] RECEIVED COMMAND: '"));
-  Serial.print(cmd);
-  Serial.println(F("'"));
+void handle(char c) {
 
-  switch (cmd) {
-    case '0':                              // Normal — stop everything
-      stopAlarm();
+  Serial.print("[ESP32] CMD=");
+  Serial.println(c);
+
+  switch (c) {
+
+    case '0':
+      stopBuzzer();
       break;
 
-    case '1':                              // Minor Fall — 2 slow beeps
-      startBeep(2, 400, 400);
+    case '1':
+      startPattern(2, 400, 400);
       break;
 
-    case '2':                              // Dangerous Fall — 5 fast beeps
-      startBeep(5, 150, 150);
+    case '2':
+      startPattern(5, 150, 150);
       break;
 
-    case '3':                              // Critical Emergency — infinite
-      startBeep(0, 100, 100);
-      break;
-
-    default:                               // Unknown — log and ignore safely
-      Serial.print(F("[ESP32] IGNORED UNKNOWN COMMAND: 0x"));
-      Serial.println((uint8_t)cmd, HEX);
+    case '3':
+      startPattern(0, 100, 100);
       break;
   }
 }
 
-// =============================================================================
-//  setup()
-// =============================================================================
+// ---------------- SETUP ----------------
 
 void setup() {
-  // Silence the buzzer FIRST — before Serial init — to prevent boot glitch
+
   pinMode(BUZZER_PIN, OUTPUT);
   buzzerOff();
 
   Serial.begin(115200);
+  delay(1000);
 
-  // Initialise FSM state
-  buz.state      = ALARM_IDLE;
-  buz.phaseUntil = 0;
-  buz.beepCount  = 0;
-  buz.beepTarget = 0;
-  buz.onMs       = 0;
-  buz.offMs      = 0;
-  buz.infOn      = false;
-
-  // Stamp command timer — prevents safety timeout firing immediately at boot
-  lastCommandTime = millis();
-  lastCmdReceived = millis();
-
-  Serial.println(F("[ESP32] READY — Fall Detection Buzzer v2.1"));
+  Serial.println("[ESP32] READY");
 }
 
-// =============================================================================
-//  loop()  — high-frequency, minimal overhead
-// =============================================================================
+// ---------------- LOOP ----------------
 
 void loop() {
 
-  // ── 1. Drain serial buffer ─────────────────────────────────────────────────
+  // ---------- Serial ----------
   while (Serial.available()) {
-    const char c = (char)Serial.read();
 
-    // Discard whitespace / line-endings / null bytes
-    if (c == '\n' || c == '\r' || c == ' ' || c == '\0') continue;
+    char c = Serial.read();
 
-    // Serial debounce — ignore if a command arrived too recently
-    const unsigned long now = millis();
-    if (now - lastCmdReceived < DEBOUNCE_MS) {
-      while (Serial.available()) Serial.read();  // flush burst
-      break;
-    }
-    lastCmdReceived = now;
-    lastCommandTime = now;   // valid command resets safety timeout
+    if (c == '\n' || c == '\r' || c == ' ') continue;
 
-    handleCommand(c);
+    unsigned long now = millis();
 
-    // Flush trailing bytes from same burst (e.g. "3\r\n" → only '3' handled)
+    if (now - lastRxTime < DEBOUNCE_MS) return;
+
+    lastRxTime = now;
+    lastCmdTime = now;
+
+    handle(c);
+
     while (Serial.available()) Serial.read();
     break;
   }
 
-  // ── 2. Tick buzzer FSM ─────────────────────────────────────────────────────
-  tickBeep();
+  // ---------- FSM ----------
+  tick();
 
-  // ── 3. Safety timeout — auto-stop if no command for SAFETY_TIMEOUT_MS ─────
-  if (buz.state != ALARM_IDLE) {
-    if (millis() - lastCommandTime > SAFETY_TIMEOUT_MS) {
-      Serial.println(F("[ESP32] SAFETY TIMEOUT — no command for 10 s"));
-      stopAlarm();
-      lastCommandTime = millis();  // re-stamp so message isn't spammed
+  // ---------- Safety timeout ----------
+  if (buz.state != IDLE) {
+    if (millis() - lastCmdTime > SAFETY_TIMEOUT_MS) {
+      Serial.println("[ESP32] TIMEOUT STOP");
+      stopBuzzer();
     }
   }
 }
