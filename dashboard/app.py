@@ -20,6 +20,7 @@ from flask_socketio import SocketIO
 from flask import send_from_directory
 
 import functools
+import threading
 import cv2
 import time
 import json
@@ -38,30 +39,57 @@ from dashboard.security import encrypt_text, decrypt_text
 
 app = Flask(__name__)
 
-# FIX: read secret key from environment so it is not hardcoded.
-app.secret_key = os.environ.get("SECRET_KEY", "aiot_fall_detection_2024")
+# Read secret key from environment; fall back to a dev default with a warning.
+_secret = os.environ.get("SECRET_KEY")
+if not _secret:
+    import warnings
+    warnings.warn(
+        "SECRET_KEY env-var is not set — using insecure default. "
+        "Set SECRET_KEY in production!",
+        stacklevel=1,
+    )
+    _secret = "aiot_fall_detection_2024"
+
+app.secret_key = _secret
 
 app.config["SESSION_PERMANENT"]       = False
 app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SECURE"]   = False
-# FIX: SameSite=Lax required so the session cookie is sent by browsers
-# when SESSION_COOKIE_SECURE is False (i.e. plain HTTP).
+app.config["SESSION_COOKIE_SECURE"]   = False   # set True behind HTTPS
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
-# FIX: do NOT pin async_mode here; it is inferred from the eventlet
-# monkey-patch applied at the top of main.py.  Pinning it to "eventlet"
-# while standard threading is also active caused intermittent errors.
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode="threading"
+    async_mode="threading",   # matches the threading async_mode in main.py
 )
 
 # =============================================================================
 # GLOBALS
 # =============================================================================
 
-engine_started = False
+# FIX: protect engine_started with a lock to prevent two concurrent
+# "connect" events from each spawning their own background task.
+_engine_lock    = threading.Lock()
+_engine_started = False
+
+# FIX: single ESP32 controller instance shared by the background engine.
+# Lazily created the first time it is needed so that import-time serial
+# errors don't crash the whole dashboard process.
+_esp32_controller      = None
+_esp32_controller_lock = threading.Lock()
+
+
+def _get_esp32():
+    """Return (creating if necessary) the shared ESP32Controller instance."""
+    global _esp32_controller
+    with _esp32_controller_lock:
+        if _esp32_controller is None:
+            try:
+                from services.esp32_service import ESP32Controller
+                _esp32_controller = ESP32Controller()
+            except Exception as e:
+                print("[ESP32] Could not create controller:", e)
+        return _esp32_controller
 
 # =============================================================================
 # USER DATABASE
@@ -121,15 +149,6 @@ def get_user_by_email(email):
     return None
 
 
-# FIX: converted to a proper decorator so routes can be written as:
-#
-#   @app.route("/dashboard")
-#   @login_required
-#   def dashboard(): ...
-#
-# The old pattern `return require_login() or render_template(…)` was
-# correct but returned None (no redirect) if is_login() happened to
-# return a falsy non-None value, which is a subtle latent bug.
 def login_required(f):
     @functools.wraps(f)
     def decorated(*args, **kwargs):
@@ -265,6 +284,7 @@ def route_verify_otp():
 @app.route("/logout")
 def logout():
     global users
+    # FIX: always reload from disk so we act on the current state.
     users = load_users()
 
     current_user = session.get("user")
@@ -281,7 +301,7 @@ def logout():
     return redirect("/")
 
 # =============================================================================
-# PAGES  (FIX: use @login_required decorator)
+# PAGES
 # =============================================================================
 
 @app.route("/dashboard")
@@ -353,26 +373,22 @@ def gen_frames():
     MJPEG generator.
 
     Reads shared_camera.latest_frame under frame_lock on every iteration.
-    FIX: the placeholder is encoded and yielded immediately instead of
-    sleeping and continuing, which prevented the multipart boundary from
-    being flushed and caused browsers to show a broken stream.
+    Falls back to a placeholder when no frame is available so the multipart
+    boundary is always flushed and browsers never see a broken stream.
     """
     import shared_camera  # local import avoids circular-dependency issues
 
     while True:
-        # ── Thread-safe frame read ────────────────────────────────────────
         with shared_camera.frame_lock:
-            raw = shared_camera.latest_frame
+            raw   = shared_camera.latest_frame
             frame = raw.copy() if raw is not None else None
 
         if frame is None:
             frame = _get_placeholder()
 
-        # ── Encode to JPEG ────────────────────────────────────────────────
         success, buffer = cv2.imencode(".jpg", frame)
         if not success:
-            # FIX: still yield the boundary so the browser doesn't stall;
-            # yield the placeholder instead of skipping the frame entirely.
+            # Yield placeholder so the browser doesn't stall.
             success, buffer = cv2.imencode(".jpg", _get_placeholder())
             if not success:
                 time.sleep(0.03)
@@ -385,11 +401,13 @@ def gen_frames():
             + b"\r\n"
         )
 
-        # ~30 fps cap
-        time.sleep(0.03)
+        time.sleep(0.03)   # ~30 fps cap
 
 
+# FIX: /video requires authentication — without this anyone on the network
+# could watch the camera stream without logging in.
 @app.route("/video")
+@login_required
 def video():
     return Response(
         gen_frames(),
@@ -397,44 +415,67 @@ def video():
     )
 
 # =============================================================================
-# REALTIME ENGINE (SocketIO)
+# REALTIME ENGINE (SocketIO background task)
 # =============================================================================
+
+# FIX: track last sent severity inside the engine function scope via a
+# mutable container so the value persists across iterations without relying
+# on a module-level variable that can be clobbered by other threads.
+_last_sent_severity = [-1]   # list used as mutable cell
+
 
 def realtime_engine():
     import shared_camera
 
     while True:
         with shared_camera.frame_lock:
-            state = shared_camera.current_state
-            risk = shared_camera.current_risk
-            level = shared_camera.current_level
+            state    = shared_camera.current_state
+            risk     = shared_camera.current_risk
+            level    = shared_camera.current_level
+            # FIX: read current_severity (now written by main.py).
             severity = shared_camera.current_severity
-    
+
+        severity = int(severity or 0)
+
+        # Send ESP32 alert only when severity changes.
+        if severity != _last_sent_severity[0]:
+            _last_sent_severity[0] = severity
+            try:
+                esp = _get_esp32()
+                if esp is not None:
+                    esp.send_alert(severity)
+            except Exception as e:
+                print("[ESP32 ERROR]", e)
 
         socketio.emit("update", {
-            "status": state or "NO_DATA",
-            "state": state or "NO_DATA",
+            "status":   state or "NO_DATA",
+            "state":    state or "NO_DATA",
+            "risk":     risk  or 0,
 
-            "risk": risk if risk is not None else 0,
-
-            "l1": severity if level == "MINOR" else 0,
+            "l1": severity if level == "MINOR"     else 0,
             "l2": severity if level == "DANGEROUS" else 0,
-            "l3": severity if level == "CRITICAL" else 0,
+            "l3": severity if level == "CRITICAL"  else 0,
 
-            "severity": severity or 0,
-            "level": level or "",
-
-            "time": time.strftime("%H:%M:%S"),
+            "severity": severity,
+            "level":    level or "",
+            "time":     time.strftime("%H:%M:%S"),
         })
-        socketio.sleep(0.2)
+
+        # FIX: async_mode=threading → use time.sleep, NOT socketio.sleep.
+        # socketio.sleep() is only valid under eventlet/gevent async modes
+        # and would block or raise under the threading backend.
+        time.sleep(0.2)
 
 
 @socketio.on("connect")
 def handle_connect():
-    global engine_started
-    if not engine_started:
-        socketio.start_background_task(realtime_engine)
-        engine_started = True
+    global _engine_started
+    # FIX: lock prevents two concurrent connect events from each starting
+    # their own background engine task.
+    with _engine_lock:
+        if not _engine_started:
+            socketio.start_background_task(realtime_engine)
+            _engine_started = True
 
 # =============================================================================
 # REPLAY API

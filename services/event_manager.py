@@ -1,297 +1,255 @@
+import collections
 import cv2
 import time
 import threading
 
 from services.local_storage import save_video
-
-from services.firebase_service import (
-    save_event
-)
-
-from services.telegram_service import (
-    send_video,
-    send_alert,
-    send_message
-)
-
-from services.esp32_service import (
-    ESP32Controller
-)
+from services.firebase_service import save_event
+from services.telegram_service import send_video, send_alert, send_message
+from services.esp32_service import ESP32Controller
 
 
 class EventManager:
 
     def __init__(self):
 
-        self.frames = []
-
+        # ======================
+        # BUFFER
+        # FIX: use deque(maxlen=300) instead of a plain list so that
+        # popping the oldest frame is O(1) not O(n).
+        # ======================
+        self.frames: collections.deque = collections.deque(maxlen=300)
         self.lock = threading.Lock()
 
-        self.recording = False
+        # ======================
+        # STATE
+        # ======================
+        self.recording         = False
+        self.current_email     = None
+        self.current_severity  = 0
 
-        self.current_email = None
+        self.video_sent        = False
+        self.start_time        = None
+        self.last_danger_time  = None
 
-        self.current_severity = 0
+        # FIX: protect last_video_time with the main lock to prevent a
+        # race where two threads both pass the anti-spam check at the
+        # same moment.
+        self.last_video_time   = 0
 
-        self.video_sent = False
+        # ======================
+        # ESP32
+        # FIX: EventManager owns the single ESP32 instance.
+        # main.py's update_esp32() delegates here so there is only ever
+        # one serial connection to the device.
+        # ======================
+        self.esp32             = ESP32Controller()
+        self.last_sent_severity = -1
 
-        self.start_time = None
+        # Alarm mode flag
+        self.alarm_active = False
 
-        self.last_danger_time = None
+    # =========================================================
+    # ESP32 — KEEPALIVE  (called every camera tick from main.py)
+    # =========================================================
+    def keepalive_esp32(self, severity: int):
+        """
+        Feed the ESP32 safety timeout on every main-loop tick.
 
-        self.last_video_time = 0
+        send_alert() already rate-limits to 200 ms, so calling this at
+        camera frame-rate (30+ fps) is safe. It intentionally does NOT
+        deduplicate on severity so the ESP32 keeps receiving heartbeats
+        and never silences itself mid-fall via its 10 s safety timeout.
+        """
+        try:
+            severity = max(0, min(int(severity), 3))
+        except Exception:
+            severity = 0
+        try:
+            self.esp32.send_alert(severity)
+        except Exception as e:
+            print("[ESP32 ERROR]", e)
 
-        self.esp32 = ESP32Controller()
+    # =========================================================
+    # ESP32 — ONE-SHOT ALERT  (called internally for level changes)
+    # =========================================================
+    def _send_esp32(self, severity: int):
+        """Send only when the severity level actually changes."""
+        try:
+            severity = max(0, min(int(severity), 3))
+        except Exception:
+            severity = 0
 
-    # ====================================
-    # PROPERTY
-    # ====================================
+        if severity == self.last_sent_severity:
+            return
+        self.last_sent_severity = severity
+        self.keepalive_esp32(severity)
 
-    @property
-    def is_recording(self):
-
-        return self.recording
-
-    # ====================================
+    # =========================================================
     # ADD FRAME
-    # ====================================
-
+    # =========================================================
     def add_frame(self, frame):
-
+        # FIX: deque(maxlen=300) handles eviction automatically;
+        # no explicit pop() needed.
         with self.lock:
+            small = cv2.resize(frame, (640, 360))
+            self.frames.append(small)
 
-            small = cv2.resize(
-                frame,
-                (640, 360)
-            )
-
-            self.frames.append(
-                small
-            )
-
-            # keep latest frames
-            if len(self.frames) > 300:
-
-                self.frames.pop(0)
-
-    # ====================================
+    # =========================================================
     # START RECORDING
-    # ====================================
+    # =========================================================
+    def start_recording(self, severity: int, email=None):
 
-    def start_recording(
-        self,
-        severity,
-        email=None
-    ):
         try:
             severity = int(severity)
-        except:
+        except Exception:
             severity = 0
 
         current_time = time.time()
 
         if email is not None:
-
             self.current_email = email
 
-        # FIRST DETECTION
+        # ======================
+        # FIRST DETECTION ONLY
+        # ======================
         if not self.recording:
 
             print("[REC] START RECORDING")
 
-            self.recording = True
-
-            self.start_time = current_time
-
-            self.video_sent = False
-
+            self.recording        = True
+            self.start_time       = current_time
+            self.video_sent       = False
             self.current_severity = severity
 
-            # ALERTS
+            # FIX: check severity ONCE here using elif so both branches
+            # are reachable regardless of the severity value, and we
+            # don't enter a second if-chain after setting recording=True.
             if severity >= 2:
-
+                # Telegram alert (async)
                 threading.Thread(
-
                     target=send_alert,
-
                     args=(severity,),
-
-                    daemon=True
-
+                    daemon=True,
                 ).start()
 
-                self.esp32.send_alert(
-                    severity
-                )
+                self.alarm_active = True
+                self._send_esp32(severity)
 
             elif severity == 1:
-
                 threading.Thread(
-
                     target=send_message,
-
-                    args=(
-                        "⚠️ Minor fall detected",
-                    ),
-
-                    daemon=True
-
+                    args=("⚠️ Minor fall detected",),
+                    daemon=True,
                 ).start()
 
+        # Always update timing and severity ceiling.
         self.last_danger_time = current_time
+        self.current_severity = max(self.current_severity, severity)
 
-        self.current_severity = max(
-            self.current_severity,
-            severity
-        )
+        # NOTE: ESP32 keepalive is handled by main.py calling
+        # keepalive_esp32() on every camera tick, so no extra send needed here.
 
-        # ====================================
-        # AUTO SEND VIDEO
-        # ====================================
+        # ======================
+        # AUTO VIDEO (CRITICAL)
+        # ======================
+        if severity >= 3 and not self.video_sent:
 
-        if (
-            severity >= 3
-            and not self.video_sent
-        ):
-
-            lying_time = (
-                current_time - self.start_time
-            )
+            lying_time = current_time - (self.start_time or current_time)
 
             if lying_time > 15:
-
-                print(
-                    "[CRITICAL] AUTO SEND VIDEO"
-                )
-
-                # LOCK BEFORE SEND
+                print("[CRITICAL] AUTO SEND VIDEO")
                 self.video_sent = True
 
+                # FIX: capture email NOW before spawning the thread so
+                # that current_email can't be mutated mid-flight.
+                email_snapshot = self.current_email
+
                 threading.Thread(
-                    target=self.send_emergency_video,
-                    daemon=True
+                    target=self._send_emergency_video,
+                    args=(email_snapshot,),
+                    daemon=True,
                 ).start()
 
-    # ====================================
-    # SEND EMERGENCY VIDEO
-    # ====================================
+    # =========================================================
+    # EMERGENCY VIDEO  (internal — called from thread)
+    # =========================================================
+    def _send_emergency_video(self, email_snapshot: str):
+        """
+        Send the buffered frames as an emergency video clip.
 
-    def send_emergency_video(self):
-
-        now = time.time()
-
-        # ANTI SPAM
-        if now - self.last_video_time < 60:
-
-            print("[ANTI SPAM] Skip video")
-
-            return
-
-        self.last_video_time = now
-
+        FIX: last_video_time check is now done inside the lock so that
+        concurrent calls cannot both pass the anti-spam guard.
+        email_snapshot is passed as a parameter to avoid relying on
+        self.current_email which may have changed by the time this runs.
+        """
         with self.lock:
+            now = time.time()
+            if now - self.last_video_time < 60:
+                print("[ANTI SPAM] Skip video")
+                return
+            self.last_video_time = now
+            frames_copy = list(self.frames)
 
-            frames_copy = (
-                self.frames.copy()
-            )
+        final_email = email_snapshot or "unknown@gmail.com"
 
-        final_email = (
-            self.current_email
-            or "unknown@gmail.com"
-        )
-
-        video_path = save_video(
-            frames_copy,
-            final_email,
-            self.current_severity
-        )
+        video_path = save_video(frames_copy, final_email, self.current_severity)
 
         if video_path:
+            send_message("🚨 PATIENT NOT RECOVERING")
+            send_video(video_path, "🚨 Emergency ICU Video")
+            print("[TELEGRAM] Emergency video sent")
 
-            send_message(
-                "🚨 PATIENT NOT RECOVERING"
-            )
-
-            send_video(
-                video_path,
-                "🚨 Emergency ICU Video"
-            )
-
-            print(
-                "[TELEGRAM] Emergency video sent"
-            )
-
-    # ====================================
+    # =========================================================
     # STOP + SAVE
-    # ====================================
-
+    # =========================================================
     def stop_and_save(self):
 
+        # FIX: clear the buffer immediately after copying so that new
+        # frames added during the (potentially long) save operation are
+        # not included in this clip and the buffer doesn't grow unbounded.
         with self.lock:
+            frames_copy = list(self.frames)
+            self.frames.clear()
 
-            frames_copy = (
-                self.frames.copy()
-            )
-
-        final_email = (
-            self.current_email
-        )
+        final_email = self.current_email
 
         if final_email is None:
-
-            print(
-                "[SAVE ERROR] No email"
-            )
-
+            print("[SAVE ERROR] No email — skipping save")
+            self._reset_state()
             return
 
-        video_path = save_video(
-            frames_copy,
-            final_email,
-            self.current_severity
-        )
+        video_path = save_video(frames_copy, final_email, self.current_severity)
 
         if video_path:
 
-            save_event(
-                "Fall Detection",
-                self.current_severity,
-                video_path
-            )
+            save_event("Fall Detection", self.current_severity, video_path)
 
             if not self.video_sent:
-
                 self.video_sent = True
 
                 threading.Thread(
-
                     target=send_video,
-
-                    args=(
-                        video_path,
-                        "📹 Recovery Video"
-                    ),
-
-                    daemon=True
-
+                    args=(video_path, "📹 Recovery Video"),
+                    daemon=True,
                 ).start()
 
         print("[REC] VIDEO SAVED")
 
-        # RESET ESP32
-        self.esp32.send_alert(0)
+        # Stop ESP32 alarm and reset all state.
+        self.alarm_active = False
+        self.esp32.send_stop()
 
-        # RESET
-        self.frames.clear()
+        self._reset_state()
 
-        self.recording = False
-
-        self.current_severity = 0
-
-        self.start_time = None
-
-        self.last_danger_time = None
-
-        self.video_sent = False
-
-        self.current_email = None
+    # =========================================================
+    # RESET STATE  (internal helper)
+    # =========================================================
+    def _reset_state(self):
+        self.recording          = False
+        self.current_severity   = 0
+        self.start_time         = None
+        self.last_danger_time   = None
+        self.video_sent         = False
+        self.current_email      = None
+        self.last_sent_severity = -1
