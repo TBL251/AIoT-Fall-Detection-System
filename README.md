@@ -6,9 +6,9 @@ The system combines Computer Vision, Deep Learning, IoT devices, Cloud Services,
 
 ---
 
-# Features
+## Features
 
-## Real-Time Fall Detection
+### Real-Time Fall Detection
 
 The system uses:
 
@@ -26,7 +26,7 @@ Severity Levels:
 
 ---
 
-## Smart Emergency Recording
+### Smart Emergency Recording
 
 The system automatically records video when a fall is detected.
 
@@ -56,35 +56,35 @@ Features:
 
 ---
 
-## Telegram Emergency Alert
+### Telegram Emergency Alert
 
 When a fall occurs:
 
 * Telegram notification is sent instantly
 * Emergency severity is included
 * Event video is uploaded automatically
-* Recovery notification can be sent
+* Recovery notification is sent on patient stabilization
 
 ---
 
-## ESP32 Emergency Alarm
+### ESP32 Emergency Alarm
 
 ESP32 integration supports:
 
-* Buzzer alarm
-* LED warning system
-* Serial communication
-* Emergency level synchronization
+* Buzzer alarm with severity-based patterns
+* Serial communication (configurable port via `ESP32_PORT` env var)
+* Emergency level synchronization (0 = Normal, 1 = Minor, 2 = Dangerous, 3 = Critical)
+* Hardware safety auto-stop timeout (10 s failsafe)
 
 ---
 
-## Flask Dashboard
+### Flask Dashboard
 
 Web-based monitoring dashboard:
 
 * User Login / Registration
 * OTP Verification
-* Live Camera Monitoring
+* Live Camera Monitoring (authenticated access only)
 * Real-Time AI Status
 * Replay Recorded Videos
 * Statistics Dashboard
@@ -92,7 +92,7 @@ Web-based monitoring dashboard:
 
 ---
 
-## Firebase Integration
+### Firebase Integration
 
 Firebase is used for:
 
@@ -103,7 +103,7 @@ Firebase is used for:
 
 ---
 
-# System Architecture
+## System Architecture
 
 ```text
 USB Camera
@@ -120,23 +120,24 @@ TCN Model
      ▼
 Fall Classification
      │
- ┌───┼─────────────┐
- │   │             │
- ▼   ▼             ▼
-ESP32 Telegram   Dashboard
-Alarm Alert      Stream
- │
- ▼
-Video Recording
+ ┌───┼──────────────────┐
+ │   │                  │
+ ▼   ▼                  ▼
+ESP32  Telegram     Dashboard
+Alarm  Alert       Live Stream
+                       │
+              ┌────────┘
+              ▼
+        Video Recording
 ```
 
 ---
 
-# Dataset
+## Dataset
 
 The model is trained using two public fall detection datasets.
 
-## UR Fall Detection Dataset
+### UR Fall Detection Dataset
 
 Contains:
 
@@ -152,7 +153,7 @@ https://fenix.ur.edu.pl/~mkepski/ds/uf.html
 
 ---
 
-## Le2i Fall Detection Dataset
+### Le2i Fall Detection Dataset
 
 Contains:
 
@@ -163,47 +164,40 @@ Contains:
 
 Official Website:
 
-https://le2i.cnrs.fr/Fall-detection-Dataset
+https://www.le2i.cnrs.fr/Fall-detection-Dataset
 
 ---
 
-# Dataset Pipeline
+## Dataset Pipeline
 
 ```text
-UR Dataset
-      │
-      ▼
-Frame Extraction
-
-Le2i Dataset
-      │
-      ▼
-Frame Extraction
-
-      ▼
-YOLO Pose Extraction
-
-      ▼
-Feature Engineering
-
-      ▼
-Merged Dataset
-
-      ▼
-TCN Training
+UR Dataset          Le2i Dataset
+     │                   │
+     ▼                   ▼
+Frame Extraction   Frame Extraction
+     │                   │
+     └─────────┬─────────┘
+               ▼
+      YOLO Pose Extraction
+               ↓
+      Feature Engineering
+               ↓
+         Merged Dataset
+               ↓
+          TCN Training
 ```
 
 ---
 
-# AI Model
+## AI Model
 
-## Pose Estimation
+### Pose Estimation
 
 ```text
 YOLO Pose
 ```
 
-## Temporal Classification
+### Temporal Classification
 
 ```text
 Temporal Convolutional Network (TCN)
@@ -225,7 +219,7 @@ Fall Event
 
 ---
 
-# Project Structure
+## Project Structure
 
 ```text
 AIoT-Fall-Detection-System/
@@ -250,10 +244,13 @@ AIoT-Fall-Detection-System/
 ├── services/
 │   ├── camera_thread.py
 │   ├── event_manager.py
-│   ├── local_storage.py
-│   ├── telegram_service.py
+│   ├── esp32_service.py
 │   ├── firebase_service.py
-│   └── esp32_service.py
+│   ├── local_storage.py
+│   └── telegram_service.py
+│
+├── esp32/
+│   └── buzzer.ino
 │
 ├── recorded_videos/
 │
@@ -266,39 +263,36 @@ AIoT-Fall-Detection-System/
 
 ---
 
-# Installation
+## Installation
 
-## Clone Repository
+### Clone Repository
 
 ```bash
 git clone https://github.com/TBL251/AIoT-Fall-Detection-System.git
-
 cd AIoT-Fall-Detection-System
 ```
 
 ---
 
-## Create Virtual Environment
+### Create Virtual Environment
 
-### Windows
+#### Windows
 
 ```bash
 python -m venv venv
-
 venv\Scripts\activate
 ```
 
-### Linux / macOS
+#### Linux / macOS
 
 ```bash
 python3 -m venv venv
-
 source venv/bin/activate
 ```
 
 ---
 
-## Install Dependencies
+### Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -306,7 +300,7 @@ pip install -r requirements.txt
 
 ---
 
-# FFmpeg Installation
+## FFmpeg Installation
 
 FFmpeg is required for:
 
@@ -326,23 +320,35 @@ ffmpeg -version
 
 ---
 
-# Environment Variables
+## Environment Variables
 
-Create a `.env` file:
+Create a `.env` file in the project root:
 
 ```env
+# Flask
+SECRET_KEY=YOUR_SECRET_KEY
+
+# Telegram
 BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
 CHAT_ID=YOUR_CHAT_ID
 
+# Email (OTP)
 MAIL_USERNAME=YOUR_EMAIL
 MAIL_PASSWORD=YOUR_EMAIL_PASSWORD
 
+# Firebase
 FIREBASE_CREDENTIALS=YOUR_FIREBASE_JSON
+
+# ESP32 (optional — defaults shown)
+ESP32_PORT=COM5
+ESP32_BAUD=115200
 ```
+
+> **Note:** `ESP32_PORT` should be set to the correct serial port for your system (e.g. `/dev/ttyUSB0` on Linux, `/dev/cu.usbserial-*` on macOS).
 
 ---
 
-# Dataset Preparation
+## Dataset Preparation
 
 Run:
 
@@ -370,7 +376,7 @@ Merge Dataset
 
 ---
 
-# Model Training
+## Model Training
 
 Run:
 
@@ -386,43 +392,36 @@ Choose:
 
 ---
 
-# Running The System
+## Running the System
 
-## Start Dashboard
-
-```bash
-python dashboard/app.py
-```
-
-Dashboard:
-
-```text
-http://127.0.0.1:5000
-```
-
----
-
-## Start AI Engine
+Start the full system (dashboard + AI engine) with a single command:
 
 ```bash
 python main.py
 ```
 
-Example camera configuration:
+The dashboard will be available at:
 
-```python
-CAMERA_INDEX = 0
+```text
+http://127.0.0.1:5000
 ```
 
-Use the index corresponding to your USB camera.
+The browser opens automatically. The AI engine starts processing the camera feed once the dashboard is ready.
+
+> **Note:** Do not run `dashboard/app.py` directly. It is started automatically by `main.py`.
+
+Camera configuration (inside `main.py`):
+
+```python
+CAMERA_INDEX = 0   # change to match your USB camera index
+```
 
 ---
 
-# Video Storage Structure
+## Video Storage Structure
 
 ```text
 recorded_videos/
-
 └── user_email/
     ├── Minor/
     ├── Dangerous/
@@ -433,7 +432,6 @@ Example:
 
 ```text
 recorded_videos/
-
 └── tbl251_gmail_com/
     └── Dangerous/
         └── event_20260531_200412.mp4
@@ -441,7 +439,7 @@ recorded_videos/
 
 ---
 
-# Technologies Used
+## Technologies Used
 
 * Python
 * OpenCV
@@ -450,24 +448,26 @@ recorded_videos/
 * TCN
 * Flask
 * Flask-SocketIO
-* Firebase
+* Werkzeug
+* PySerial
+* Firebase Admin SDK
 * Telegram Bot API
 * FFmpeg
-* ESP32
+* ESP32 (Arduino)
 
 ---
 
-# Security Features
+## Security Features
 
-* Password Hashing
-* Email Encryption
-* OTP Verification
-* Session Management
-* Protected Dashboard Access
+* Password hashing (Werkzeug PBKDF2)
+* Email encryption (stored encrypted at rest)
+* OTP email verification on registration
+* Flask session management with `HttpOnly` and `SameSite=Lax` cookies
+* All dashboard routes and the live camera stream require authentication
 
 ---
 
-# Future Improvements
+## Future Improvements
 
 * Multi-person fall detection
 * TensorRT optimization
@@ -475,19 +475,18 @@ recorded_videos/
 * Mobile application
 * Healthcare analytics dashboard
 * Cloud AI inference
+* LED warning indicator on ESP32
 
 ---
 
-# License
+## License
 
 MIT License
 
 ---
 
-# Author
+## Author
 
 TBL251
 
-GitHub:
-
-https://github.com/TBL251/AIoT-Fall-Detection-System
+GitHub: https://github.com/TBL251/AIoT-Fall-Detection-System
