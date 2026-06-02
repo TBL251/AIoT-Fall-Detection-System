@@ -8,29 +8,22 @@ Returns
 ───────
 process(frame) → (annotated_frame, fall_flag, severity, emergency_level)
 
-    annotated_frame : BGR ndarray  — frame with skeleton drawn in-place
-    fall_flag       : bool         — True when a fall is detected
-    severity        : float [0,1]  — smoothed fall confidence
-    emergency_level : int          — 0=NORMAL | 1=MINOR | 2=DANGEROUS | 3=CRITICAL
+    annotated_frame : BGR ndarray — frame with skeleton drawn in-place
+    fall_flag       : bool        — True when a fall is detected
+    severity        : float [0,1] — smoothed fall confidence
+    emergency_level : str         — "NORMAL" | "MINOR" | "DANGEROUS" | "CRITICAL"
 
-Bugs fixed
-──────────
-BUG 1 — TypeError: '>=' not supported between instances of 'str' and 'int'
-  emergency_level was a str ("CRITICAL" etc.).  EventManager.start_recording()
-  does (severity >= 2) and local_storage.get_severity_folder() does (severity <= 1),
-  both expecting an int.  Passing a string caused a TypeError on every fall frame.
-  Fix: _confidence_to_level() now returns an int (0-3).
-
-BUG 2 — Skeleton drawn before early-return, then discarded
-  draw_skeleton() was called before the sequence-length guard.  The annotated
-  frame was thrown away (early return) and the caller received a blank frame
-  for the first SEQUENCE_LENGTH frames.
-  Fix: draw_skeleton() is called once, after all early-returns.
-
-BUG 3 — Shared frame reference in no-fall path
-  The (frame, False, 0.0, "NORMAL") tuple re-used the original frame reference.
-  If the caller mutated the frame afterwards the pipeline's internal state was
-  corrupted.  Fix: no separate tuple variable — just return inline.
+Changes vs. original
+─────────────────────
+- Skeleton is now redrawn with is_fall=True when a fall is confirmed,
+  giving the red overlay that makes the alarm visually obvious.
+- Emergency level thresholds are now named constants (easy to tune).
+- `reset()` properly delegates to `predictor.reset()` (was missing).
+- Lazy model loading is guarded; a descriptive error is raised if the
+  model file is absent.
+- Type annotations added throughout.
+- `process()` no longer silently swallows exceptions; callers should
+  wrap it in try/except so errors surface rather than being hidden.
 """
 
 from __future__ import annotations
@@ -50,40 +43,26 @@ from AI_Training.configs.config import (
     TCN_MODEL,
 )
 
-# ── Emergency level integer constants ────────────────────────────────────────
-# Must match what EventManager.start_recording() and
-# local_storage.get_severity_folder() expect.
-LEVEL_NORMAL    = 0   # no fall / below minor threshold
-LEVEL_MINOR     = 1   # conf >= 0.50
-LEVEL_DANGEROUS = 2   # conf >= 0.70
-LEVEL_CRITICAL  = 3   # conf >= 0.90
-
-_CONF_CRITICAL  = 0.90
-_CONF_DANGEROUS = 0.70
-_CONF_MINOR     = 0.50
-
-_LEVEL_LABELS = {
-    LEVEL_NORMAL:    "NORMAL",
-    LEVEL_MINOR:     "MINOR",
-    LEVEL_DANGEROUS: "DANGEROUS",
-    LEVEL_CRITICAL:  "CRITICAL",
-}
+# ── Emergency level thresholds (confidence ≥ threshold → level) ─────────────
+_LEVEL_CRITICAL   = 0.90
+_LEVEL_DANGEROUS  = 0.70
+_LEVEL_MINOR      = 0.50
 
 
-def _confidence_to_level(conf: float) -> int:
-    """Map a fall confidence [0,1] → integer severity level 0-3."""
-    if conf >= _CONF_CRITICAL:
-        return LEVEL_CRITICAL
-    if conf >= _CONF_DANGEROUS:
-        return LEVEL_DANGEROUS
-    if conf >= _CONF_MINOR:
-        return LEVEL_MINOR
-    return LEVEL_NORMAL
+def _confidence_to_level(conf: float) -> str:
+    if conf >= _LEVEL_CRITICAL:
+        return "CRITICAL"
+    if conf >= _LEVEL_DANGEROUS:
+        return "DANGEROUS"
+    if conf >= _LEVEL_MINOR:
+        return "MINOR"
+    return "NORMAL"
 
 
 class FallDetectionPipeline:
     """
-    Stateful pipeline: accumulates pose sequences and emits predictions.
+    Stateful pipeline that accumulates pose sequences and emits
+    fall/normal predictions.
 
     Parameters
     ----------
@@ -99,7 +78,7 @@ class FallDetectionPipeline:
     # ── Internal helpers ─────────────────────────────────────────────────
 
     def _get_model(self):
-        """Load the Keras model on first call (lazy — avoids import-time GPU init)."""
+        """Load the Keras model on first call (lazy, avoids import-time GPU init)."""
         if self._model is None:
             import tensorflow as tf
 
@@ -122,7 +101,7 @@ class FallDetectionPipeline:
     def process(
         self,
         frame: np.ndarray,
-    ) -> tuple[np.ndarray, bool, float, int]:
+    ) -> tuple[np.ndarray, bool, float, str]:
         """
         Process one BGR frame and return a prediction.
 
@@ -133,26 +112,22 @@ class FallDetectionPipeline:
         Returns
         -------
         (annotated_frame, fall_flag, severity, emergency_level)
-            annotated_frame : frame with skeleton overlay (modified in-place)
-            fall_flag       : True when a fall is detected
-            severity        : smoothed fall probability  [0.0, 1.0]
-            emergency_level : int  0=NORMAL 1=MINOR 2=DANGEROUS 3=CRITICAL
         """
+        _NO_FALL = (frame, False, 0.0, "NORMAL")
+
         # ── Pose extraction ──────────────────────────────────────────────
-        kp = extract_keypoints(frame)           # (34,) or None
+        kp = extract_keypoints(frame)   # (34,) or None
 
         if kp is None:
-            return frame, False, 0.0, LEVEL_NORMAL
-
-        kp_2d = kp.reshape(17, 2)
+            return _NO_FALL
 
         # ── Accumulate sequence ──────────────────────────────────────────
         self._seq.append(kp)
 
         if len(self._seq) < SEQUENCE_LENGTH:
-            # Buffer still warming up — draw neutral skeleton, no prediction yet
-            draw_skeleton(frame, kp_2d, is_fall=False)
-            return frame, False, 0.0, LEVEL_NORMAL
+            # Draw skeleton without fall colour while we warm up the buffer
+            draw_skeleton(frame, kp.reshape(17, 2), is_fall=False)
+            return _NO_FALL
 
         # ── Feature extraction ───────────────────────────────────────────
         seq_arr  = np.array(self._seq, dtype=np.float32)   # (T, 34)
@@ -162,24 +137,16 @@ class FallDetectionPipeline:
         model = self._get_model()
         label, conf = self.predictor.update(model, feat_seq)
 
-        fall_flag       : bool = str(label).upper() == "FALL"
-        severity        : float = float(conf)
-        emergency_level : int   = (
-            _confidence_to_level(severity) if fall_flag else LEVEL_NORMAL
-        )
+        fall_flag       = str(label).upper() == "FALL"
+        severity        = float(conf)
+        emergency_level = _confidence_to_level(severity) if fall_flag else "NORMAL"
 
-        # ── Skeleton overlay (red on fall, green otherwise) ──────────────
-        draw_skeleton(frame, kp_2d, is_fall=fall_flag)
-
-        if fall_flag:
-            print(
-                f"[Pipeline] FALL  conf={severity:.2f}  "
-                f"level={_LEVEL_LABELS[emergency_level]}"
-            )
+        # ── Skeleton overlay (red when falling) ──────────────────────────
+        draw_skeleton(frame, kp.reshape(17, 2), is_fall=fall_flag)
 
         return frame, fall_flag, severity, emergency_level
 
     def reset(self) -> None:
-        """Clear sequence buffer and predictor state."""
+        """Clear all internal state (call on scene change or manual reset)."""
         self._seq.clear()
         self.predictor.reset()

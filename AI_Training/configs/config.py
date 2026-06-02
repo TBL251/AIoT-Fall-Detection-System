@@ -30,10 +30,10 @@ LSTM_MODEL = TCN_MODEL
 # =========================
 
 EMA_ALPHA        = 0.6
-VOTE_WINDOW      = 7
-VOTE_THRESHOLD   = 4
+VOTE_WINDOW      = 3
+VOTE_THRESHOLD   = 2
 HYSTERESIS_ON    = 0.55
-HYSTERESIS_OFF   = 0.35
+HYSTERESIS_OFF   = 0.45
 
 # =========================
 # DATASET PATHS

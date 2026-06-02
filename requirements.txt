@@ -9,7 +9,8 @@
 #
 # Install order for this file:
 #   Step 1 — PyTorch GPU (must come FIRST, uses its own index):
-#     pip install torch==2.3.1+cu121 torchvision==0.18.1+cu121 torchaudio==2.3.1+cu121  --index-url https://download.pytorch.org/whl/cu121
+#     pip install torch==2.3.1+cu121 torchvision==0.18.1+cu121 torchaudio==2.3.1+cu121 ^
+#         --index-url https://download.pytorch.org/whl/cu121
 #
 #   Step 2 — Everything else:
 #     pip install -r requirements.txt
