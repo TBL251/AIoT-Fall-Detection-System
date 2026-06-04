@@ -31,6 +31,11 @@ class EventManager:
         self.video_sent        = False
         self.start_time        = None
         self.last_danger_time  = None
+        
+        self.alert_level_sent = 0
+        
+        self.alert_sent = False
+        self.alert_delay = 3.0
 
         # FIX: protect last_video_time with the main lock to prevent a
         # race where two threads both pass the anti-spam check at the
@@ -53,14 +58,6 @@ class EventManager:
     # ESP32 — KEEPALIVE  (called every camera tick from main.py)
     # =========================================================
     def keepalive_esp32(self, severity: int):
-        """
-        Feed the ESP32 safety timeout on every main-loop tick.
-
-        send_alert() already rate-limits to 200 ms, so calling this at
-        camera frame-rate (30+ fps) is safe. It intentionally does NOT
-        deduplicate on severity so the ESP32 keeps receiving heartbeats
-        and never silences itself mid-fall via its 10 s safety timeout.
-        """
         try:
             severity = max(0, min(int(severity), 3))
         except Exception:
@@ -99,7 +96,6 @@ class EventManager:
     # START RECORDING
     # =========================================================
     def start_recording(self, severity: int, email=None):
-
         try:
             severity = int(severity)
         except Exception:
@@ -120,35 +116,72 @@ class EventManager:
             self.recording        = True
             self.start_time       = current_time
             self.video_sent       = False
+            self.alert_sent = False 
             self.current_severity = severity
+            
+        # Always update timing and severity ceiling.
+        self.last_danger_time = current_time
+        self.current_severity = max(self.current_severity, severity)
+        
+        # ======================
+        # DELAY ALERT
+        # ======================
 
-            # FIX: check severity ONCE here using elif so both branches
-            # are reachable regardless of the severity value, and we
-            # don't enter a second if-chain after setting recording=True.
-            if severity >= 2:
-                # Telegram alert (async)
-                threading.Thread(
-                    target=send_alert,
-                    args=(severity,),
-                    daemon=True,
-                ).start()
+        if (
+            self.recording
+            and not self.alert_sent
+            and self.start_time is not None
+        ):
 
-                self.alarm_active = True
-                self._send_esp32(severity)
+            elapsed = time.time() - self.start_time
 
-            elif severity == 1:
+            if elapsed >= self.alert_delay:
+
+                self.alert_sent = True
+
+                highest = self.current_severity
+
+                print(
+                    f"[ALERT] Highest level = {highest}"
+                )
+
+                if highest == 1:
+
+                    threading.Thread(
+                        target=send_message,
+                        args=("⚠️ Minor fall detected",),
+                        daemon=True,
+                    ).start()
+
+                else:
+
+                    threading.Thread(
+                        target=send_alert,
+                        args=(highest,),
+                        daemon=True,
+                    ).start()
+        
+        # severity tăng lên mức mới
+        if self.current_severity > self.alert_level_sent:
+
+            self.alert_level_sent = self.current_severity
+
+            if self.current_severity == 1:
+
                 threading.Thread(
                     target=send_message,
                     args=("⚠️ Minor fall detected",),
                     daemon=True,
                 ).start()
 
-        # Always update timing and severity ceiling.
-        self.last_danger_time = current_time
-        self.current_severity = max(self.current_severity, severity)
+            elif self.current_severity >= 2:
 
-        # NOTE: ESP32 keepalive is handled by main.py calling
-        # keepalive_esp32() on every camera tick, so no extra send needed here.
+                threading.Thread(
+                    target=send_alert,
+                    args=(self.current_severity,),
+                    daemon=True,
+                ).start()
+
 
         # ======================
         # AUTO VIDEO (CRITICAL)
@@ -175,14 +208,6 @@ class EventManager:
     # EMERGENCY VIDEO  (internal — called from thread)
     # =========================================================
     def _send_emergency_video(self, email_snapshot: str):
-        """
-        Send the buffered frames as an emergency video clip.
-
-        FIX: last_video_time check is now done inside the lock so that
-        concurrent calls cannot both pass the anti-spam guard.
-        email_snapshot is passed as a parameter to avoid relying on
-        self.current_email which may have changed by the time this runs.
-        """
         with self.lock:
             now = time.time()
             if now - self.last_video_time < 60:
@@ -241,6 +266,7 @@ class EventManager:
         self.esp32.send_stop()
 
         self._reset_state()
+        self.alert_level_sent = 0
 
     # =========================================================
     # RESET STATE  (internal helper)
@@ -251,5 +277,6 @@ class EventManager:
         self.start_time         = None
         self.last_danger_time   = None
         self.video_sent         = False
+        self.alert_sent = False
         self.current_email      = None
         self.last_sent_severity = -1

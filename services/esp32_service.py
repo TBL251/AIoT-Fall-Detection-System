@@ -18,6 +18,8 @@ class ESP32Controller:
         self.port     = port
         self.baudrate = baudrate
         self.ser      = None
+        
+        self.connection_error_shown = False
 
         self.last_send_time    = 0
         self.min_interval      = 0.2   # anti-spam (200 ms)
@@ -47,8 +49,11 @@ class ESP32Controller:
             time.sleep(2)   # allow ESP32 to reset after DTR toggle
             print(f"[ESP32] Connected on {self.port}")
         except Exception as e:
-            self.ser = None
-            print(f"[ESP32] Not connected ({self.port}):", e)
+            if not self.connection_error_shown:
+                print(
+                    f"[ESP32] Not connected ({self.port}): {e}"
+                )
+                self.connection_error_shown = True
 
     # ======================
     # SAFE WRITE

@@ -162,11 +162,15 @@ try:
             continue
 
         # Clamp severity to a valid int in [0, 3].
-        try:
-            severity_int = int(severity)
-        except Exception:
+        if level_str == "CRITICAL":
+            severity_int = 3
+        elif level_str == "DANGEROUS":
+            severity_int = 2
+        elif level_str == "MINOR":
+            severity_int = 1
+        else:
             severity_int = 0
-        severity_int = max(0, min(severity_int, 3))
+            
 
         # =========================
         # FALL LOGIC

@@ -1,28 +1,3 @@
-"""
-services/local_storage.py
-──────────────────────────
-Saves fall-event frame buffers to disk as H.264 MP4 files via FFmpeg.
-
-Bugs fixed
-──────────
-BUG 1 — FFMPEG_PATH is hard-coded to a machine-specific absolute path.
-  If FFmpeg is on the system PATH (standard install), or if the project
-  moves to another machine, the hard-coded path breaks.
-  Fix: check the hard-coded path first; if absent, fall back to "ffmpeg"
-  (system PATH).  If neither works, log a clear error.
-
-BUG 2 — save_video() accepted `severity` as any type but
-  get_severity_folder() did (severity <= 1) which raised TypeError when
-  severity was a str.  Now fixed in pipeline.py (always int), and
-  get_severity_folder() has a defensive int() cast with a fallback.
-
-BUG 3 — frames list is checked with `if not frames` which is False for
-  an empty deque too, but the type annotation said list.  Kept as-is
-  since EventManager now converts deque → list before calling save_video.
-
-BUG 4 — Hard-coded email fallback "unknown" folder.  If email is None
-  save_video() would crash on .replace().  Added a None guard.
-"""
 
 from __future__ import annotations
 

@@ -20,7 +20,7 @@ def create_user_folder(email: str):
 
     low_folder = os.path.join(user_folder, "Minor")
     medium_folder = os.path.join(user_folder, "Dangerous")
-    critical_folder = os.path.join(user_folder, "Critical Emergency")
+    critical_folder = os.path.join(user_folder, "Critical_Emergency")
 
     os.makedirs(low_folder, exist_ok=True)
     os.makedirs(medium_folder, exist_ok=True)

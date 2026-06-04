@@ -499,7 +499,7 @@ def api_replays():
     if not os.path.exists(user_folder):
         return jsonify(result)
 
-    for level in ("Minor", "Dangerous", "Critical Emergency"):
+    for level in ("Minor", "Dangerous", "Critical_Emergency"):
         level_path = os.path.join(user_folder, level)
         if not os.path.exists(level_path):
             continue
